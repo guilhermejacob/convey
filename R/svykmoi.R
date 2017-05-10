@@ -4,6 +4,9 @@
 #'
 #' @param formula a formula specifying the income variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
+#' @param ref.point a string giving the labels of the "reference point". If not given, it defaults to the median category.
+#' @param a a parameter giving the sensivity towards inequality below the reference point. Default to 1.
+#' @param b a parameter giving the sensivity towards inequality over the reference point. Default to 1.
 #' @param na.rm Should cases with missing values be dropped?
 #' @param ... future expansion
 #'
@@ -19,65 +22,56 @@
 #'
 #' @seealso \code{\link{svygei}}
 #'
-#' @references Nicholas Rohde (2016). J-divergence measurements of economic inequality.
-#' J. R. Statist. Soc. A, v. 179, Part 3 (2016), pp. 847-870.
-#' URL \url{http://onlinelibrary.wiley.com/doi/10.1111/rssa.12153/abstract}.
+#' @references Martyna Kobus and Pyotr Milos. Inequality decomposition by population subgroups for ordinal data.
+#' \emph{Journal of Health Economics}, Vol.31, No.1 (2016), pp. 15-21.
+#' URL \url{http://www.sciencedirect.com/science/article/pii/S0167629611001664}.
 #'
-#' Martin Biewen and Stephen Jenkins (2002). Estimation of Generalized Entropy
-#' and Atkinson Inequality Indices from Complex Survey Data. \emph{DIW Discussion Papers},
-#' No.345,
-#' URL \url{https://www.diw.de/documents/publikationen/73/diw_01.c.40394.de/dp345.pdf}.
 #'
 #' @keywords survey
 #'
 #' @examples
 #' library(survey)
 #' library(vardpoor)
-#' data(eusilc) ; names( eusilc ) <- tolower( names( eusilc ) )
+#' data(ses) ; names( ses ) <- tolower( names( ses ) )
 #'
 #' # linearized design
-#' des_eusilc <- svydesign( ids = ~rb030 , strata = ~db040 ,  weights = ~rb050 , data = eusilc )
-#' des_eusilc <- convey_prep(des_eusilc)
+#' des_ses <- svydesign( ids = ~rb030 , strata = ~db040 ,  weights = ~rb050 , data = ses )
+#' des_ses <- convey_prep(des_ses)
+#' des_ses <- update( des_ses, education = ordered( education ) )
 #'
-#' svykmoi( ~eqincome , design = subset( des_eusilc , eqincome > 0 ) )
+#' svykmoi( ~education , design = des_ses , ref.point = "ISCED 3 and 4" )
 #'
 #' # replicate-weighted design
-#' des_eusilc_rep <- as.svrepdesign( des_eusilc , type = "bootstrap" )
-#' des_eusilc_rep <- convey_prep(des_eusilc_rep)
+#' des_ses_rep <- as.svrepdesign( des_ses , type = "bootstrap" )
+#' des_ses_rep <- convey_prep(des_ses_rep)
 #'
-#' svykmoi( ~eqincome , design = subset( des_eusilc_rep , eqincome > 0 ) )
+#' svykmoi( ~education , design = des_ses_rep , ref.point = "ISCED 3 and 4" )
 #'
 #' \dontrun{
-#'
-#' # linearized design using a variable with missings
-#' svykmoi( ~py010n , design = subset( des_eusilc , py010n > 0 | is.na( py010n ) ) )
-#' svykmoi( ~py010n , design = subset( des_eusilc , py010n > 0 | is.na( py010n ) ), na.rm = TRUE )
-#' # replicate-weighted design using a variable with missings
-#' svykmoi( ~py010n , design = subset( des_eusilc_rep , py010n > 0 | is.na( py010n ) ) )
-#' svykmoi( ~py010n , design = subset( des_eusilc_rep , py010n > 0 | is.na( py010n ) ) , na.rm = TRUE )
 #'
 #' # database-backed design
 #' library(MonetDBLite)
 #' library(DBI)
 #' dbfolder <- tempdir()
 #' conn <- dbConnect( MonetDBLite::MonetDBLite() , dbfolder )
-#' dbWriteTable( conn , 'eusilc' , eusilc )
+#' dbWriteTable( conn , 'ses' , ses )
 #'
-#' dbd_eusilc <-
+#' dbd_ses <-
 #' 	svydesign(
 #' 		ids = ~rb030 ,
 #' 		strata = ~db040 ,
 #' 		weights = ~rb050 ,
-#' 		data="eusilc",
+#' 		data="ses",
 #' 		dbname=dbfolder,
 #' 		dbtype="MonetDBLite"
 #' 	)
 #'
-#' dbd_eusilc <- convey_prep( dbd_eusilc )
+#' dbd_ses <- convey_prep( dbd_ses )
+#' dbd_ses <- update( dbd_ses, education = ordered( education ) )
 #'
-#' svykmoi( ~eqincome , design = subset( dbd_eusilc , eqincome > 0 ) )
+#' svykmoi( ~education , design = dbd_ses , ref.point = "ISCED 3 and 4" )
 #'
-#' dbRemoveTable( conn , 'eusilc' )
+#' dbRemoveTable( conn , 'ses' )
 #'
 #' dbDisconnect( conn , shutdown = TRUE )
 #'
@@ -96,18 +90,11 @@ svykmoi <- function(formula, design, ...) {
 
 #' @rdname svykmoi
 #' @export
-svykmoi.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
-
-  stop("this function hasn't been implemented for non-replicate designs")
-
-}
-
-
-#' @rdname svykmoi
-#' @export
-svykmoi.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
+svykmoi.survey.design <- function ( formula, design, ref.point = NULL, a = 1 , b = 1 , na.rm = FALSE , ... ) {
 
   ordvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+
+  if (!("ordered" %in% class(ordvar))) stop( "This function is defined for ordinal variables only. See ?svykmoi for examples." )
 
   if(na.rm){
     nas<-is.na(ordvar)
@@ -119,17 +106,87 @@ svykmoi.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
   ws <- weights(design, "sampling")
 
   cmprop <- calc.cmprop( x = ordvar, weights = ws )
-  kmoi <- calc.kmoi( cmprop )
+
+  N <- sum( ws )
+  lin.mat <- sapply( levels(ordvar) , FUN = function( i ) {
+    ifelse( ordvar <= i , 1 , 0 ) / N
+  } , USE.NAMES = TRUE )
+  lin.mat <- as.matrix(lin.mat)
+
+  # reference point
+  if ( is.null(ref.point) ) {
+    m <- match( names( calc.medcat( cmprop ) ) , names( cmprop ) )
+    if ( length(m) > 1 ) { stop("non-unique median category. Use refpoint= to set a reference point.") }
+  } else {
+    m <- match( ref.point , names( cmprop ) )
+  }
+
+  # number of categories
+  k <- length(cmprop)
+
+  # normalizing constants
+  c1 <- b * ( k + 1 - m )
+  c2 <- (m - 1)*a/2 - (k + 2 - m)*b/2 + c1
+
+  # estimate Kobus & Milos (2012) ordinal inequality measure
+  part1 <- a * ( if ( m > 2 ) rowSums( lin.mat [ , 1:( m - 1 ) ] )  else lin.mat [ , 1 ] )
+  part2 <- b * ( if ( m < k ) rowSums( lin.mat [ , m:k ] )  else lin.mat [ , k ] )
+
+  estimate <-
+    contrastinf( quote( (A - B + c1)/c2 ),
+                 list( A = list( value = a * sum( cmprop[ 1:(m-1) ] ) , lin = part1 ) ,
+                       B = list( value = b * sum( cmprop[ m:k ] ), lin = part2 ) ,
+                       c1 = list( value = c1 , lin = rep( 0 , length(part1) ) ) ,
+                       c2 = list( value = c2 , lin = rep( 0 , length(part1) ) ) ) )
+
+  variance <- survey::svyrecvar(estimate$lin/design$prob, design$cluster,design$strata, design$fpc, postStrata = design$postStrata)
+
+  rval <- estimate$value
+  colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+  class(rval) <- c( "cvystat" , "svrepstat" )
+  attr(rval, "var") <- variance
+  attr(rval, "statistic") <- "kobus-milos measure"
+  attr(rval, "reference") <- if ( is.null(ref.point) ) { names( calc.medcat( cmprop ) ) } else { ref.point }
+
+  return( rval )
+
+}
+
+
+#' @rdname svykmoi
+#' @export
+svykmoi.svyrep.design <- function ( formula, design, ref.point = NULL , a = 1 , b = 1 , na.rm = FALSE , ... ) {
+
+  ordvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+
+  if (!("ordered" %in% class(ordvar))) stop( "This function is defined for ordinal variables only. See ?svykmoi for examples." )
+
+  if(na.rm){
+    nas<-is.na(ordvar)
+    design<-design[!nas,]
+    df <- model.frame(design)
+    ordvar <- ordvar[!nas]
+  }
+
+  ws <- weights(design, "sampling")
+
+  cmprop <- calc.cmprop( x = ordvar, weights = ws )
+  # reference point
+  if ( is.null(ref.point) ) {
+    ref.point <- names(ref.point)
+  }
+  kmoi <- calc.kmoi( cmprop , ref.point = ref.point )
 
   ww <- weights(design, "analysis")
   qq.cmprop <- apply(ww, 2, function(wi) calc.cmprop( ordvar, wi ) )
-  qq <- apply( qq.cmprop, 2, function(iter) { calc.kmoi( iter ) } )
+  qq <- apply( qq.cmprop, 2, function(iter) { calc.kmoi( iter , ref.point = ref.point ) } )
   if ( any(is.na(qq))) {
-    variance <- as.matrix(NA)
-    colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+    rval <- NA
     class(rval) <- c( "cvystat" , "svrepstat" )
-    attr(rval, "var") <- variance
-    attr(rval, "statistic") <- "j-divergence"
+    attr(rval, "var") <- NA
+    attr(rval, "statistic") <- "kobus-milos measure"
+    attr(rval, "reference") <- NA
 
     return(rval)
 
@@ -138,10 +195,11 @@ svykmoi.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
 
     variance <- as.matrix( variance )
   }
-  colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+  rval <- kmoi
   class(rval) <- c( "cvystat" , "svrepstat" )
   attr(rval, "var") <- variance
-  attr(rval, "statistic") <- "j-divergence"
+  attr(rval, "statistic") <- "kobus-milos measure"
+  attr(rval, "reference") <- if ( is.null(ref.point) ) { names( calc.medcat( cmprop ) ) } else { ref.point }
 
   return( rval )
 
@@ -182,11 +240,10 @@ calc.medcat <- function( proportions ) {
 }
 
 # J-divergence measure:
-calc.kmoi <- function( proportions , medcat = NULL , a = 1 , b = 1 ) {
+calc.kmoi <- function( proportions , ref.point , a = 1 , b = 1 ) {
 
   k <- length(proportions)
-  if (is.null(medcat)) { medcat <- calc.medcat( proportions ) ; m <- match( names( medcat ) , names(proportions) ) }
-  else { m <- medcat }
+  m <- match( ref.point , names(proportions) )
   gamma <- a * sum( proportions[ 1:(m - 1) ] ) - b * sum( proportions[ m:k ] )
   c1 <- b*( k + 1 - m )
   c2 <- ( m - 1 ) * a/2 - ( k + 2 - m )*b/2 + c1
