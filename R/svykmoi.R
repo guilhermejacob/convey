@@ -92,6 +92,9 @@ svykmoi <- function(formula, design, ...) {
 #' @export
 svykmoi.survey.design <- function ( formula, design, ref.point = NULL, a = 1 , b = 1 , na.rm = FALSE , ... ) {
 
+  if( a < 0 ) stop( "a= parameter has to be greater or equal to zero. " )
+  if( b < 0 ) stop( "b= parameter has to be greater or equal to zero. " )
+
   ordvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
   if (!("ordered" %in% class(ordvar))) stop( "This function is defined for ordinal variables only. See ?svykmoi for examples." )
@@ -115,7 +118,8 @@ svykmoi.survey.design <- function ( formula, design, ref.point = NULL, a = 1 , b
 
   # reference point
   if ( is.null(ref.point) ) {
-    m <- match( names( calc.medcat( cmprop ) ) , names( cmprop ) )
+    ref.point <- names( calc.medcat( cmprop ) )
+    m <- match( ref.point , names( cmprop ) )
     if ( length(m) > 1 ) { stop("non-unique median category. Use refpoint= to set a reference point.") }
   } else {
     m <- match( ref.point , names( cmprop ) )
@@ -146,7 +150,7 @@ svykmoi.survey.design <- function ( formula, design, ref.point = NULL, a = 1 , b
   class(rval) <- c( "cvystat" , "svrepstat" )
   attr(rval, "var") <- variance
   attr(rval, "statistic") <- "kobus-milos measure"
-  attr(rval, "reference") <- if ( is.null(ref.point) ) { names( calc.medcat( cmprop ) ) } else { ref.point }
+  attr(rval, "reference") <- ref.point
 
   return( rval )
 
@@ -156,6 +160,9 @@ svykmoi.survey.design <- function ( formula, design, ref.point = NULL, a = 1 , b
 #' @rdname svykmoi
 #' @export
 svykmoi.svyrep.design <- function ( formula, design, ref.point = NULL , a = 1 , b = 1 , na.rm = FALSE , ... ) {
+
+  if( a < 0 ) stop( "a= parameter has to be greater or equal to zero. " )
+  if( b < 0 ) stop( "b= parameter has to be greater or equal to zero. " )
 
   ordvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
@@ -173,13 +180,18 @@ svykmoi.svyrep.design <- function ( formula, design, ref.point = NULL , a = 1 , 
   cmprop <- calc.cmprop( x = ordvar, weights = ws )
   # reference point
   if ( is.null(ref.point) ) {
-    ref.point <- names(ref.point)
+    ref.point <- names( calc.medcat( cmprop ) )
+    m <- match( ref.point , names( cmprop ) )
+    if ( length(m) > 1 ) { stop("non-unique median category. Use refpoint= to set a reference point.") }
+  } else {
+    m <- match( ref.point , names( cmprop ) )
   }
-  kmoi <- calc.kmoi( cmprop , ref.point = ref.point )
+  kmoi <- calc.kmoi( cmprop , ref.point = ref.point , a = a , b = b )
+
 
   ww <- weights(design, "analysis")
   qq.cmprop <- apply(ww, 2, function(wi) calc.cmprop( ordvar, wi ) )
-  qq <- apply( qq.cmprop, 2, function(iter) { calc.kmoi( iter , ref.point = ref.point ) } )
+  qq <- apply( qq.cmprop, 2, function(iter) { calc.kmoi( iter , ref.point = ref.point , a = a , b = b ) } )
   if ( any(is.na(qq))) {
 
     rval <- NA
@@ -195,7 +207,9 @@ svykmoi.svyrep.design <- function ( formula, design, ref.point = NULL , a = 1 , 
 
     variance <- as.matrix( variance )
   }
+
   rval <- kmoi
+  colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
   class(rval) <- c( "cvystat" , "svrepstat" )
   attr(rval, "var") <- variance
   attr(rval, "statistic") <- "kobus-milos measure"
@@ -239,7 +253,7 @@ calc.medcat <- function( proportions ) {
 
 }
 
-# J-divergence measure:
+# Kobus-Milos ordinal inequality measure:
 calc.kmoi <- function( proportions , ref.point , a = 1 , b = 1 ) {
 
   k <- length(proportions)
