@@ -3,7 +3,7 @@ library(convey)
 
 no.na <- function( z , value = FALSE ){ z[ is.na( z ) ] <- value ; z }
 
-all_funs <- list( svyrmir , svyqsr , svyarpt , svyarpt , svyatk , svyfgt , svygini , svygpg , svyiqalpha , svyisq , svyzenga , svypoormed  , svyrenyi , svygei  , svyrmpg  , svyzengacurve , svylorenz , svyjdiv , svyamato , svyafc , svybmi, svysst, svysen, svybcc )
+all_funs <- list( svyrmir , svyqsr , svyarpt , svyarpt , svyatk , svyfgt , svygini , svygpg , svyiqalpha , svyisq , svyzenga , svypoormed  , svyrenyi , svygei  , svyrmpg  , svyzengacurve , svylorenz , svyjdiv , svyamato , svyafc , svybmi, svysst, svysen, svybcc , svyrich , svychu , svywatts )
 
 for( n in c( 50 , 1000 ) ){
 
@@ -129,6 +129,27 @@ for( n in c( 50 , 1000 ) ){
 
 			    lin_params_list <- c( lin_params_list , list( cutoffs = list( 10000, 5000 ) ) )
 			    rep_params_list <- c( rep_params_list , list( cutoffs = list( 10000, 5000 ) ) )
+
+			  }
+
+			  if( identical( FUN , svyrich ) ){
+
+			    lin_params_list <- c( lin_params_list , list( type_measure = "FGTT1", g=1, type_thresh= "abs", abs_thresh=30000 ) )
+			    rep_params_list <- c( rep_params_list , list( type_measure = "FGTT1", g=1, type_thresh= "abs", abs_thresh=30000 ) )
+
+			  }
+
+			  if( identical( FUN , svychu ) ){
+
+			    lin_params_list <- c( lin_params_list , list( g=1, type_thresh= "abs", abs_thresh=10000 ) )
+			    rep_params_list <- c( rep_params_list , list( g=1, type_thresh= "abs", abs_thresh=10000 ) )
+
+			  }
+
+			  if( identical( FUN , svywatts ) ){
+
+			    lin_params_list <- c( lin_params_list , list( type_thresh= "abs", abs_thresh=10000 ) )
+			    rep_params_list <- c( rep_params_list , list( type_thresh= "abs", abs_thresh=10000 ) )
 
 			  }
 

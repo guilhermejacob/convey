@@ -228,7 +228,11 @@ print.cvydstat <- function(x, ...) {
   m <- matrix( x[[1]], nrow = 1 )
   m <- rbind( m , matrix( sqrt( diag(vv) ), nrow = 1 ) )
 
-  dimnames(m) <- list( c( "coef", "SE" ), c( "total", "within", "between" ) )
+  if ( grepl( "watts index decomposition|fgt.* decomposition", attr( x , "statistic" ) ) ) {
+    dimnames(m) <- list( c( "coef", "SE" ), names(coef(x)) )
+  } else {
+    dimnames(m) <- list( c( "coef", "SE" ), c( "total", "within", "between" ) )
+  }
 
   printCoefmat(m, digits = 5)
 
@@ -364,6 +368,23 @@ svyby.convey.design <-
 							getvars(by, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset) ,
 							getvars(list( ... )[["age"]], design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
 						)
+
+
+			} else if( 'subgroup' %in% names( list( ... ) ) ){
+
+			  full_design$variables <-
+			    cbind(
+			      getvars(formula, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset),
+			      getvars(by, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset) ,
+			      getvars(list( ... )[["subgroup"]], full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset)
+			    )
+
+			  design$variables <-
+			    cbind(
+			      getvars(formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset),
+			      getvars(by, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset) ,
+			      getvars(list( ... )[["subgroup"]], design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
+			    )
 
 
 			} else {
