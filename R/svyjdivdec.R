@@ -117,13 +117,15 @@ svyjdivdec.survey.design <-
     w <- 1/design$prob
     ff <- sapply( list( formula , subgroup ) , function(z) attr( terms.formula( z ) , "term.labels" ) )
     ff <- as.formula( paste0( "~" , paste( ff , collapse = " + ") ) )
-    mm <- model.frame( ff , design$variables, na.action = na.pass)
+    mm <- model.frame( ff , design$variables, na.action = na.pass , drop.unused.levels = TRUE )
+
+    if( class( mm[ , 2] ) != "factor" ) stop( "the `subgroup=` argument must specify a factor variable" )
 
     if (na.rm) {
       nas <- rowSums( is.na( mm ) ) > 0
       design <- design[nas == 0, ]
       w <- 1/design$prob
-      mm <- model.frame( ff , design$variables, na.action = na.pass)
+      mm <- model.frame( ff , design$variables, na.action = na.pass , drop.unused.levels = TRUE )
     }
 
     if ( any( is.na( mm ) [ w > 0 , ] ) ) {
@@ -140,7 +142,9 @@ svyjdivdec.survey.design <-
     }
 
     incvar <- mm[ , 1 ]
-    gmat <- model.matrix( update( subgroup , ~.+0 ) , design$variables )
+    gmat <- model.matrix( update( subgroup , ~.+0 ) , mm )
+    gmat[ is.na( gmat ) ] <- 0
+    if ( !all( apply( gmat [  w > 0 , ] , 2 , sum ) > 0 ) ) gmat <- gmat[ , apply( gmat [  w > 0 , ] , 2 , sum ) > 0 ]
     rm( mm )
     if ( any( incvar[ w > 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
@@ -259,12 +263,14 @@ svyjdivdec.svyrep.design <-
     ws <- weights(design, "sampling")
     ff <- sapply( list( formula , subgroup ) , function(z) attr( terms.formula( z ) , "term.labels" ) )
     ff <- as.formula( paste0( "~" , paste( ff , collapse = " + ") ) )
-    mm <- model.frame( ff , design$variables, na.action = na.pass)
+    mm <- model.frame( ff , design$variables, na.action = na.pass , drop.unused.levels = TRUE )
+
+    if( class( mm[ , 2] ) != "factor" ) stop( "the `subgroup=` argument must specify a factor variable" )
 
     if (na.rm) {
       nas <- rowSums( is.na( mm ) & ws > 0 ) > 0
       design <- design[nas == 0, ]
-      mm <- model.frame( ff , design$variables, na.action = na.pass)
+      mm <- model.frame( ff , design$variables, na.action = na.pass , drop.unused.levels = TRUE )
       ws <- weights(design, "sampling")
     }
 
@@ -282,7 +288,9 @@ svyjdivdec.svyrep.design <-
     }
 
     incvar <- mm[ , 1 ]
-    gmat <- model.matrix( update( subgroup , ~.+0 ) , design$variables )
+    gmat <- model.matrix( update( subgroup , ~.+0 ) , mm )
+    gmat[ is.na( gmat ) ] <- 0
+    if ( !all( apply( gmat [  ws > 0 , ] , 2 , sum ) > 0 ) ) gmat <- gmat[ , apply( gmat [  ws > 0 , ] , 2 , sum ) > 0 ]
     rm( mm )
     if ( any( incvar[ ws > 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
