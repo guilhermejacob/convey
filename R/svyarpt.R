@@ -181,7 +181,7 @@ svyarpt.svyrep.design <-
 		quant_val <- as.vector(quant_val)
 		rval <- percent * quant_val
 		ww <- weights(design, "analysis")
-		qq <- apply(ww, 2, function(wi) 0.6 * computeQuantiles(incvar, wi, p = quantiles))
+		qq <- apply(ww, 2, function(wi) percent * computeQuantiles(incvar, wi, p = quantiles))
 		if(anyNA(qq))variance <- NA
 		else variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
 
