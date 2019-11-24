@@ -5,15 +5,15 @@
 \alias{svyjdivdec.survey.design}
 \alias{svyjdivdec.svyrep.design}
 \alias{svyjdivdec.DBIsvydesign}
-\title{J-Divergence Decomposition (EXPERIMENTAL)}
+\title{J-divergence Decomposition}
 \usage{
 svyjdivdec(formula, subgroup, design, ...)
 
-\method{svyjdivdec}{survey.design}(formula, subgroup, design, na.rm = FALSE,
-  ...)
+\method{svyjdivdec}{survey.design}(formula, subgroup, design,
+  na.rm = FALSE, ...)
 
-\method{svyjdivdec}{svyrep.design}(formula, subgroup, design, na.rm = FALSE,
-  ...)
+\method{svyjdivdec}{svyrep.design}(formula, subgroup, design,
+  na.rm = FALSE, ...)
 
 \method{svyjdivdec}{DBIsvydesign}(formula, subgroup, design, ...)
 }
@@ -26,21 +26,18 @@ svyjdivdec(formula, subgroup, design, ...)
 
 \item{...}{future expansion}
 
-\item{na.rm}{Should cases with missing values be dropped? Observations containing missing values in income or group variables will be dropped.}
+\item{na.rm}{Should cases with missing values be dropped? Observations containing missing values in income or subgroup variable will be dropped.}
 }
 \value{
 Object of class "\code{cvydstat}", which are vectors with a "\code{var}" attribute giving the variance-covariance matrix and a "\code{statistic}" attribute giving the name of the statistic.
 }
 \description{
-Estimates the group decomposition of the generalized entropy index
+Estimates the subgroup decomposition of the J-divergence
 }
 \details{
 you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
 
 This measure only allows for strictly positive variables.
-}
-\note{
-This function is experimental and is subject to change in later versions.
 }
 \examples{
 library(survey)
@@ -125,6 +122,6 @@ URL \url{https://www.diw.de/documents/publikationen/73/diw_01.c.40394.de/dp345.p
 \code{\link{svyjdiv}}
 }
 \author{
-Guilherme Jacob, Djalma Pessoa and Anthony Damico
+Guilherme Jacob
 }
 \keyword{survey}

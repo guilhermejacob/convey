@@ -1,11 +1,11 @@
-#' J-Divergence Decomposition (EXPERIMENTAL)
+#' J-divergence Decomposition
 #'
-#' Estimates the group decomposition of the generalized entropy index
+#' Estimates the subgroup decomposition of the J-divergence
 #'
 #' @param formula a formula specifying the income variable
 #' @param subgroup a formula specifying the group variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
-#' @param na.rm Should cases with missing values be dropped? Observations containing missing values in income or group variables will be dropped.
+#' @param na.rm Should cases with missing values be dropped? Observations containing missing values in income or subgroup variable will be dropped.
 #' @param ... future expansion
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -14,9 +14,7 @@
 #'
 #' @return Object of class "\code{cvydstat}", which are vectors with a "\code{var}" attribute giving the variance-covariance matrix and a "\code{statistic}" attribute giving the name of the statistic.
 #'
-#' @author Guilherme Jacob, Djalma Pessoa and Anthony Damico
-#'
-#' @note This function is experimental and is subject to change in later versions.
+#' @author Guilherme Jacob
 #'
 #' @seealso \code{\link{svyjdiv}}
 #'
@@ -105,9 +103,7 @@ svyjdivdec <-
 
     if( length( attr( terms.formula( formula ) , "term.labels" ) ) > 1 ) stop( "convey package functions currently only support one variable in the `formula=` argument" )
 
-    if( length( attr( terms.formula( subgroup ) , "term.labels" ) ) > 1 ) stop( "convey package functions currently only support one variable in the `subgroup=` argument" )
-
-    warning("The svyjdivdec function is experimental and is subject to changes in later versions.")
+    if( length( attr( terms.formula( subgroup ) , "term.labels" ) ) > 1 ) stop( "the `subgroup=` argument must have only one variable" )
 
     UseMethod("svyjdivdec", design)
 
@@ -119,29 +115,18 @@ svyjdivdec.survey.design <-
   function ( formula, subgroup, design, na.rm = FALSE, ... ) {
 
     w <- 1/design$prob
-    incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
-    grpvar <- model.frame( subgroup, design$variables, na.action = na.pass)[,]
-
-    if ( class(grpvar) == "labelled" ) {
-      stop( "This function does not support 'labelled' variables. Try factor().")
-    }
+    ff <- sapply( list( formula , subgroup ) , function(z) attr( terms.formula( z ) , "term.labels" ) )
+    ff <- as.formula( paste0( "~" , paste( ff , collapse = " + ") ) )
+    mm <- model.frame( ff , design$variables, na.action = na.pass)
 
     if (na.rm) {
-      nas <- ( is.na(incvar) | is.na(grpvar ) )
+      nas <- rowSums( is.na( mm ) ) > 0
       design <- design[nas == 0, ]
       w <- 1/design$prob
-      incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
-      grpvar <- model.frame( subgroup, design$variables, na.action = na.pass)[,]
+      mm <- model.frame( ff , design$variables, na.action = na.pass)
     }
 
-
-    if ( any( incvar[ w != 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
-
-    incvar <- incvar[ w > 0 ]
-    grpvar <- grpvar[ w > 0 ]
-    w <- w[ w > 0 ]
-
-    if ( any( any( is.na(incvar) | is.na(grpvar ) ) & (w > 0) ) ) {
+    if ( any( is.na( mm ) [ w > 0 , ] ) ) {
 
       rval <- list( estimate = matrix( c( NA, NA, NA ), dimnames = list( c( "total", "within", "between" ) ) )[,] )
       names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -154,110 +139,89 @@ svyjdivdec.survey.design <-
 
     }
 
-    grpvar <- interaction( grpvar )
+    incvar <- mm[ , 1 ]
+    gmat <- model.matrix( update( subgroup , ~.+0 ) , design$variables )
+    rm( mm )
+    if ( any( incvar[ w > 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
-    # total
-    U_0 <- list( value = sum( w ), lin = rep( 1, length( incvar ) ) )
-    U_1 <- list( value = sum( w * incvar ), lin = incvar )
-    T_0 <- list( value = sum( w * log( incvar ) ), lin = log( incvar ) )
-    T_1 <- list( value = sum( w * incvar * log( incvar ) ), lin = incvar * log( incvar ) )
-
-    list_all <- list(  U_0 = U_0, U_1 = U_1, T_0 = T_0, T_1 = T_1 )
-    estimate <- contrastinf( quote( ( T_1 / U_1 ) - ( T_0 / U_0 ) ) , list_all )
-
-    ttl.jdiv <- estimate$value
-    ttl.jdiv.lin <- 1/design$prob
-    ttl.jdiv.lin[ ttl.jdiv.lin > 0 ] <- estimate$lin
-
-    # within:
-
-    # Theil T index:
-    grp.theilt <- NULL
-    grp.theilt.lin <- matrix( NA, nrow = length(incvar), ncol = length( levels( grpvar ) ) )
-    grp.theilt.wtd <- NULL
-    grp.theilt.wtd.lin <- matrix( NA, nrow = length(incvar), ncol = length( levels( grpvar ) ) )
-
-    for ( i in seq_along( levels(grpvar) ) ) {
-      w_i <- w
-      w_i[ grpvar != levels(grpvar)[i] ] <- 0
-
-      U_0_i <- list( value = sum( w_i ), lin = rep( 1, length( incvar ) ) )
-      U_1_i <- list( value = sum( w_i * incvar ), lin = incvar )
-      T_0_i <- list( value = sum( w_i * log( incvar ) ), lin = log( incvar ) )
-      T_1_i <- list( value = sum( w_i * incvar * log( incvar ) ), lin = incvar * log( incvar ) )
-      Y_AVG_i <- contrastinf( quote( U_1_i / U_0_i ), list( U_0_i = U_0_i , U_1_i = U_1_i ) )
-
-      list_all <- list(  U_0 = U_0, U_1 = U_1, T_0 = T_0, T_1 = T_1, Y_AVG_i = Y_AVG_i, U_1_i = U_1_i, T_1_i = T_1_i )
-      estimate <- contrastinf( quote( ( 1 / U_1_i ) * ( T_1_i - log( Y_AVG_i ) * U_1_i ) ) , list_all )
-
-      grp.theilt[i] <- estimate$value
-      grp.theilt.lin[,i] <- estimate$lin * ( w_i != 0 )
-
-      estimate <- contrastinf( quote( grp_theilt * U_1_i / U_1 ) , list( grp_theilt = estimate, U_1_i = U_1_i, U_1 = U_1 ) )
-      grp.theilt.wtd[i] <- estimate$value
-      grp.theilt.wtd.lin[,i] <- estimate$lin * ( w_i != 0 )
-
-      rm(i, w_i, estimate)
-
+    # internal functions
+    gei0_efun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+    }
+    gei1_efun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+    }
+    gei0_linfun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      gei0 <- - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+      ifelse( w > 0 , -(1/N) * ( log( y / mu ) + gei0 ) + (1/mu) * ( y - mu ) / N , 0 )
+    }
+    gei1_linfun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+      ifelse( w > 0 , (1/N) * ( ( y / mu ) * log( y / mu ) - gei1 ) - (1/mu) *( gei1 + 1 ) * ( y - mu ) / N , 0 )
+    }
+    phi_efun <- function( y , w , alpha , ind ) {
+      N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
+      N <- sum( ifelse( w > 0 , w , 0 ) )
+      Y_j <- sum( ifelse( ( ind * w ) > 0 , w * y , 0 ) )
+      Y <- sum( ifelse( w > 0 , w * y , 0 ) )
+      sest <- Y_j / Y ; pest <- N_j / N
+      sest^alpha * pest^( 1 - alpha )
+    }
+    phi_linfun <- function( y , w , alpha , ind ) {
+      N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
+      N <- sum( ifelse( w > 0 , w , 0 ) )
+      Y_j <- sum( ifelse( ( ind * w ) > 0 , w * y , 0 ) )
+      Y <- sum( ifelse( w > 0 , w * y , 0 ) )
+      sest <- Y_j / Y ; pest <- N_j / N
+      phiest <- sest^alpha * pest^( 1 - alpha )
+      slin <- ifelse( w > 0 , (1/Y) * ( ind * y - sest * y ) , 0 )
+      plin <- ifelse( w > 0 , (1/N) * ( ind - pest ) , 0 )
+      ifelse( w  > 0 , phiest * ( alpha * slin / sest + ( 1 - alpha ) * plin / pest ) , 0 )
     }
 
-    wtn.theilt <- sum( grp.theilt.wtd )
-    w_teste <- 1/design$prob
-    w_teste[ w_teste > 0 ] <- apply( grp.theilt.wtd.lin, 1, sum )
-    wtn.theilt.lin <- w_teste ; rm( w_teste )
-
-
-    # Theil L index:
-    grp.theill <- NULL
-    grp.theill.lin <- matrix( NA, nrow = length(incvar), ncol = length( levels( grpvar ) ) )
-    grp.theill.wtd <- NULL
-    grp.theill.wtd.lin <- matrix( NA, nrow = length(incvar), ncol = length( levels( grpvar ) ) )
-
-    for ( i in seq_along( levels(grpvar) ) ) {
-      w_i <- w
-      w_i[ grpvar != levels(grpvar)[i] ] <- 0
-
-      U_0_i <- list( value = sum( w_i ), lin = rep( 1, length( incvar ) ) )
-      U_1_i <- list( value = sum( w_i * incvar ), lin = incvar )
-      T_0_i <- list( value = sum( w_i * log( incvar ) ), lin = log( incvar ) )
-      T_1_i <- list( value = sum( w_i * incvar * log( incvar ) ), lin = incvar * log( incvar ) )
-      Y_AVG_i <- contrastinf( quote( U_1_i / U_0_i ), list(  U_0_i = U_0_i, U_1_i = U_1_i ) )
-
-      list_all <- list(  U_0 = U_0, U_1 = U_1, T_0 = T_0, T_1 = T_1, Y_AVG_i = Y_AVG_i, U_0_i = U_0_i, U_1_i = U_1_i, T_0_i = T_0_i, T_1_i = T_1_i )
-      estimate <- contrastinf( quote( ( 1 / U_0_i ) * ( log( Y_AVG_i ) * U_0_i - T_0_i ) ) , list_all )
-
-      grp.theill[i] <- estimate$value
-      grp.theill.lin[,i] <- estimate$lin * ( w_i != 0 )
-
-      estimate <- contrastinf( quote( grp_theill * U_0_i / U_0 ) , list( grp_theill = estimate, U_0_i = U_0_i, U_0 = U_0 ) )
-      grp.theill.wtd[i] <- estimate$value
-      grp.theill.wtd.lin[,i] <- estimate$lin * ( w_i != 0 )
-
-      rm(i, w_i, estimate)
-
-    }
-
-    wtn.theill <- sum( grp.theill.wtd )
-    w_teste <- 1/design$prob
-    w_teste[ w_teste > 0 ] <- apply( grp.theill.wtd.lin, 1, sum )
-    wtn.theill.lin <- w_teste ; rm( w_teste )
-
-    # Within component:
-    within.jdiv <- wtn.theilt + wtn.theill
-    within.jdiv.lin <- wtn.theilt.lin + wtn.theill.lin
-
-    # between:
+    # estimates
+    ttl.jdiv <- gei1_efun( incvar , w ) + gei0_efun( incvar , w )
+    within.jdiv  <- apply( gmat, 2 , function( ind ) {
+      phi_efun( incvar , w , alpha = 0 , ind = ind ) * gei0_efun( incvar , w * ind ) +
+        phi_efun( incvar , w , alpha = 1 , ind = ind ) * gei1_efun( incvar , w * ind )
+    } )
+    within.jdiv <- sum( within.jdiv )
     between.jdiv <- ttl.jdiv - within.jdiv
+
+    # linearization
+    ttl.jdiv.lin <- gei0_linfun( incvar , w ) + gei1_linfun( incvar , w )
+    within.jdiv.lin  <- apply( gmat , 2 , function( ind ) {
+      phi0 <- phi_efun( incvar , w , alpha = 0 , ind = ind )
+      gei0 <- gei0_efun( incvar , w * ind )
+      phi1 <- phi_efun( incvar , w , alpha = 1 , ind = ind )
+      gei1 <- gei1_efun( incvar , w * ind )
+      phi0_lin <- phi_linfun( incvar , w , alpha = 0 , ind = ind )
+      gei0_lin <- gei0_linfun( incvar , w * ind )
+      phi1_lin <- phi_linfun( incvar , w , alpha = 1 , ind = ind )
+      gei1_lin <- gei1_linfun( incvar , w * ind )
+      pt0 <- gei0 * phi0_lin + gei0_lin * phi0
+      pt1 <- gei1 * phi1_lin + gei1_lin * phi1
+      ifelse( w > 0 , pt0 + pt1 , 0 )
+    } )
+    within.jdiv.lin <- rowSums( within.jdiv.lin )
     between.jdiv.lin <- ttl.jdiv.lin - within.jdiv.lin
 
-    estimates <- matrix( c( ttl.jdiv, within.jdiv, between.jdiv ), dimnames = list( c( "total", "within", "between" ) ) )[,]
-
     lin.matrix <- matrix( data = c(ttl.jdiv.lin, within.jdiv.lin, between.jdiv.lin), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
+
+    estimates <- matrix( c( ttl.jdiv, within.jdiv, between.jdiv ), dimnames = list( c( "total", "within", "between" ) ) )[,]
     variance <- survey::svyrecvar( lin.matrix/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
 
     rval <- list( estimate = estimates )
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    attr(rval, "var") <- variance[1:3,1:3]
+    attr(rval, "var") <- variance
     attr(rval, "statistic") <- "j-divergence decomposition"
     attr(rval,"group")<- as.character( subgroup )[[2]]
     class(rval) <- c( "cvydstat" , "cvystat" , "svystat" )
@@ -272,108 +236,86 @@ svyjdivdec.survey.design <-
 svyjdivdec.svyrep.design <-
   function( formula, subgroup, design, na.rm=FALSE, ...) {
 
-    # J-divergence measure:
-    calc.jdiv <-  function( x, weights ) {
-
-      x <- x[ weights > 0]
-      weights <- weights[ weights > 0]
-
-      avg <- sum( x * weights ) / sum( weights )
-      jdiv = ( ( x - avg ) / avg ) * log( x / avg )
-
-      return( sum( jdiv * weights ) / sum( weights ) )
-
+    # aux funs
+    gei0_efun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
     }
-
-    incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
-    grpvar <- model.frame( subgroup, design$variables, na.action = na.pass)[,]
-
-    if(na.rm){
-      nas<-is.na(incvar) | is.na(grpvar)
-      design<-design[!nas,]
-      df <- model.frame(design)
-      incvar <- incvar[!nas]
-      grpvar <- grpvar[!nas]
+    gei1_efun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+    }
+    phi_efun <- function( y , w , alpha , ind ) {
+      N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
+      N <- sum( ifelse( w > 0 , w , 0 ) )
+      Y_j <- sum( ifelse( ( ind * w ) > 0 , w * y , 0 ) )
+      Y <- sum( ifelse( w > 0 , w * y , 0 ) )
+      sest <- Y_j / Y ; pest <- N_j / N
+      sest^alpha * pest^( 1 - alpha )
     }
 
     ws <- weights(design, "sampling")
+    ff <- sapply( list( formula , subgroup ) , function(z) attr( terms.formula( z ) , "term.labels" ) )
+    ff <- as.formula( paste0( "~" , paste( ff , collapse = " + ") ) )
+    mm <- model.frame( ff , design$variables, na.action = na.pass)
 
-    if ( any( incvar[ ws != 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes." )
+    if (na.rm) {
+      nas <- rowSums( is.na( mm ) & ws > 0 ) > 0
+      design <- design[nas == 0, ]
+      mm <- model.frame( ff , design$variables, na.action = na.pass)
+      ws <- weights(design, "sampling")
+    }
 
-    if ( any( is.na(incvar) | is.na(grpvar) ) ) {
+    if ( any( is.na( mm ) [ ws > 0 , ] ) ) {
 
       rval <- list( estimate = matrix( c( NA, NA, NA ), dimnames = list( c( "total", "within", "between" ) ) )[,] )
       names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
       attr(rval, "var") <- matrix( rep(NA,9), ncol = 3, dimnames = list( c( "total", "within", "between" ), c( "total", "within", "between" ) ) )[,]
       attr(rval, "statistic") <- "j-divergence decomposition"
       attr(rval,"group")<- as.character( subgroup )[[2]]
-      class(rval) <- c( "cvydstat" , "cvystat" , "svystat" , "svrepstat" )
+      class(rval) <- c( "cvydstat" , "cvystat" , "svystat" )
 
       return(rval)
 
     }
 
-    grpvar <- interaction( grpvar )
+    incvar <- mm[ , 1 ]
+    gmat <- model.matrix( update( subgroup , ~.+0 ) , design$variables )
+    rm( mm )
+    if ( any( incvar[ ws > 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
     ww <- weights(design, "analysis")
 
     # Total
-    ttl.jdiv <- calc.jdiv( x = incvar, weights = ws )
-    qq.ttl.jdiv <- apply(ww, 2, function(wi) calc.jdiv(incvar, wi ) )
+    ttl.jdiv <- gei1_efun( incvar , ws ) + gei0_efun( incvar , ws )
+    qq.ttl.jdiv <- apply(ww, 2, function(wi) gei1_efun( incvar , wi ) + gei0_efun( incvar , wi ) )
 
     # within
+    within.jdiv <- sum( apply( gmat, 2 , function( ind ) {
+      phi_efun( incvar , ws , alpha = 0 , ind = ind ) * gei0_efun( incvar , ws * ind ) +
+        phi_efun( incvar , ws , alpha = 1 , ind = ind ) * gei1_efun( incvar , ws * ind )
+    } ) )
+    qq.within.jdiv <- apply( ww, 2, function(wi) {
 
-    # Theil T index:
-    grp.wtd.theilt <- NULL
-    qq.grp.wtd.theilt <- matrix( NA, nrow = length(qq.ttl.jdiv), ncol = length( levels( grpvar ) ) )
-    for ( i in seq_along( levels(grpvar) ) ) {
-      ind <- 1*( grpvar == levels(grpvar)[i] )
+      sum( apply( gmat, 2 , function( ind ) {
+        phi_efun( incvar , wi , alpha = 0 , ind = ind ) * gei0_efun( incvar , wi * ind ) +
+          phi_efun( incvar , wi , alpha = 1 , ind = ind ) * gei1_efun( incvar , wi * ind )
+      } ) )
 
-      grp.theilt <- calc.gei( x = incvar, weights = ws * ind, epsilon = 1 )
-      qq.grp.theilt <- apply(ww, 2, function(wi) calc.gei( incvar, wi * ind, epsilon = 1 ) )
-
-      grp.incshr <- sum( incvar * ind * ws ) / sum( incvar * ws )
-      qq.grp.incshr <- apply( ww, 2, function(wi) { sum( incvar * ind * wi ) / sum( incvar * wi ) } )
-
-      grp.wtd.theilt[i] <- grp.theilt * grp.incshr
-      qq.grp.wtd.theilt[,i] <- qq.grp.theilt * qq.grp.incshr
-
-    }
-
-    # Theil L index:
-    grp.wtd.theill <- NULL
-    qq.grp.wtd.theill <- matrix( NA, nrow = length(qq.ttl.jdiv), ncol = length( levels( grpvar ) ) )
-    for ( i in seq_along( levels(grpvar) ) ) {
-
-      ind <- 1*( grpvar == levels(grpvar)[i] )
-
-      grp.theill <- calc.gei( x = incvar, weights = ws * ind, epsilon = 0 )
-      qq.grp.theill <- apply(ww, 2, function(wi) calc.gei( incvar, wi * ind, epsilon = 0 ) )
-
-      grp.popshr <- sum( ind * ws ) / sum( ws )
-      qq.grp.popshr <- apply( ww, 2, function(wi) { sum( ind * wi ) / sum( wi ) } )
-
-      grp.wtd.theill[i] <- grp.theill * grp.popshr
-      qq.grp.wtd.theill[,i] <- qq.grp.theill * qq.grp.popshr
-
-    }
-
-    # Within component:
-    within.jdiv <- sum( grp.wtd.theilt + grp.wtd.theill )
-    qq.within.jdiv <- apply( qq.grp.wtd.theilt + qq.grp.wtd.theill, 1, sum )
+    } )
 
     # Between:
     between.jdiv <- ttl.jdiv - within.jdiv
     qq.between.jdiv <- qq.ttl.jdiv - qq.within.jdiv
 
-
-
+    # variance
     qq.matrix <- matrix( c( qq.ttl.jdiv, qq.within.jdiv, qq.between.jdiv ), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
     variance <- survey::svrVar( qq.matrix, design$scale, design$rscales, mse = design$mse, coef = matrix( ttl.jdiv, within.jdiv, between.jdiv ) )
 
     rval <- list( estimate = matrix( c( ttl.jdiv, within.jdiv, between.jdiv ), dimnames = list( c( "total", "within", "between" ) ) )[,] )
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    #attr(rval, "var") <- variance[1:3, 1:3]
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "j-divergence decomposition"
     attr(rval,"group")<- as.character( subgroup )[[2]]

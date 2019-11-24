@@ -1,6 +1,6 @@
-#' J-divergence measure (EXPERIMENTAL)
+#' J-divergence measure
 #'
-#' Estimate the j-divergence measure, an entropy-based measure of inequality
+#' Estimate the J-divergence measure, an entropy-based measure of inequality
 #'
 #' @param formula a formula specifying the income variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
@@ -15,9 +15,7 @@
 #'
 #' @author Guilherme Jacob
 #'
-#' @note This function is experimental and is subject to change in later versions.
-#'
-#' @seealso \code{\link{svygei}}
+#' @seealso \code{\link{svyjdivdec}} , \code{\link{svygei}}
 #'
 #' @references Nicholas Rohde (2016). J-divergence measurements of economic inequality.
 #' J. R. Statist. Soc. A, v. 179, Part 3 (2016), pp. 847-870.
@@ -88,8 +86,6 @@ svyjdiv <- function(formula, design, ...) {
 
   if( length( attr( terms.formula( formula ) , "term.labels" ) ) > 1 ) stop( "convey package functions currently only support one variable in the `formula=` argument" )
 
-  warning("The svyjdiv function is experimental and is subject to changes in later versions.")
-
   UseMethod("svyjdiv", design)
 
 }
@@ -98,53 +94,70 @@ svyjdiv <- function(formula, design, ...) {
 #' @export
 svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
 
-  incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+  w <- 1/design$prob
+  incvar <- model.frame( formula , design$variables, na.action = na.pass)[,]
 
   if (na.rm) {
-    nas <- is.na(incvar)
+    nas <- is.na( incvar )
     design <- design[nas == 0, ]
-    if ( length(nas) > length(design$prob) ) { incvar <- incvar[nas == 0] }
+    w <- 1/design$prob
+    incvar <- model.frame( formula , design$variables, na.action = na.pass)[,]
   }
 
-  incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
-  w <- 1/design$prob
+  if ( any( is.na( incvar ) [ w > 0 ] ) ) {
 
-  incvar <- incvar[ w > 0 ]
-  w <- w[ w > 0 ]
-
-  if ( any( incvar <= 0 , na.rm = TRUE ) ) stop( "The J-divergence measure is defined for strictly positive variables only.  Negative and zero values not allowed." )
-
-  rval <- NULL
-
-  U_0 <- list( value = sum( w ), lin = rep( 1, length( incvar ) ) )
-  U_1 <- list( value = sum( w * incvar ), lin = incvar )
-  T_0 <- list( value = sum( w * log( incvar ) ), lin = log( incvar ) )
-  T_1 <- list( value = sum( w * incvar * log( incvar ) ), lin = incvar * log( incvar ) )
-
-  list_all <- list(  U_0 = U_0, U_1 = U_1, T_0 = T_0, T_1 = T_1 )
-  estimate <- contrastinf( quote( ( T_1 / U_1 ) - ( T_0 / U_0 ) ) , list_all )
-
-  rval <- estimate$value
-
-  if ( is.na(rval) ) {
+    rval <- NA
     variance <- as.matrix(NA)
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    class(rval) <- c( "cvystat" , "svystat" )
-    attr(rval, "statistic") <- "j-divergence"
     attr(rval, "var") <- variance
-    return(rval)
+    attr(rval, "statistic") <- "j-divergence decomposition"
+    class(rval) <- c( "cvystat" , "svrepstat" )
+
+    return( rval )
+
   }
 
-  lin <- 1*( 1/design$prob > 0)
-  lin[ lin > 0 ] <- estimate$lin
-  estimate$lin <- lin ; rm( lin , w )
-  variance <- survey::svyrecvar( estimate$lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
+  if ( any( incvar[ w > 0 ] <= 0 , na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
+  # internal functions
+  gei0_efun <- function( y , w ) {
+    N <- sum( w )
+    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+    - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+  }
+  gei1_efun <- function( y , w ) {
+    N <- sum( w )
+    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+    sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+  }
+  gei0_linfun <- function( y , w ) {
+    N <- sum( w )
+    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+    gei0 <- - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+    ifelse( w > 0 , -(1/N) * ( log( y / mu ) + gei0 ) + (1/mu) * ( y - mu ) / N , 0 )
+  }
+  gei1_linfun <- function( y , w ) {
+    N <- sum( w )
+    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+    gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+    ifelse( w > 0 , (1/N) * ( ( y / mu ) * log( y / mu ) - gei1 ) - (1/mu) *( gei1 + 1 ) * ( y - mu ) / N , 0 )
+  }
+
+  # estimates
+  rval <- gei1_efun( incvar , w ) + gei0_efun( incvar , w )
+
+  # linearization
+  ttl.jdiv.lin <- gei0_linfun( incvar , w ) + gei1_linfun( incvar , w )
+
+  # variance
+  variance <- survey::svyrecvar( ttl.jdiv.lin/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
+
+  # output object
   colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
   class(rval) <- c( "cvystat" , "svystat" )
   attr(rval, "statistic") <- "j-divergence"
   attr(rval, "var") <- variance
-  attr(rval, "lin") <- estimate$lin
+  attr(rval, "lin") <- ttl.jdiv.lin
 
   rval
 
@@ -155,47 +168,56 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
 #' @export
 svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
 
-  incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
-
-  if(na.rm){
-    nas<-is.na(incvar)
-    design<-design[!nas,]
-    df <- model.frame(design)
-    incvar <- incvar[!nas]
+  # aux funs
+  gei0_efun <- function( y , w ) {
+    N <- sum( w )
+    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+    - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+  }
+  gei1_efun <- function( y , w ) {
+    N <- sum( w )
+    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+    sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
   }
 
   ws <- weights(design, "sampling")
+  incvar <- model.frame( formula , design$variables, na.action = na.pass)[ , ]
 
-  if ( any( incvar[ws != 0] <= 0, na.rm = TRUE ) ) stop( "The J-divergence measure is defined for strictly positive variables only.  Negative and zero values not allowed." )
+  if (na.rm) {
+    nas <- rowSums( is.na( incvar ) & ws > 0 ) > 0
+    design <- design[nas == 0, ]
+    incvar <- model.frame( formula , design$variables, na.action = na.pass)[ , ]
+    ws <- weights(design, "sampling")
+  }
 
-  rval <- calc.jdiv( x = incvar, weights = ws )
-  if ( is.na(rval) ) {
+  if ( any( incvar[ ws > 0 ] <= 0, na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
+
+  if ( any( is.na( incvar ) [ ws > 0 ] ) ) {
+
+    rval <- NA
     variance <- as.matrix(NA)
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
-    attr(rval, "statistic") <- "j-divergence"
+    attr(rval, "statistic") <- "j-divergence decomposition"
+    class(rval) <- c( "cvystat" , "svrepstat" )
 
     return(rval)
+
   }
 
   ww <- weights(design, "analysis")
-  qq <- apply(ww, 2, function(wi) calc.jdiv(incvar, wi ) )
-  if ( any(is.na(qq))) {
-    variance <- as.matrix(NA)
-    colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    class(rval) <- c( "cvystat" , "svrepstat" )
-    attr(rval, "var") <- variance
-    attr(rval, "statistic") <- "j-divergence"
 
-    return(rval)
+  # estimate
+  rval <- gei1_efun( incvar , ws ) + gei0_efun( incvar , ws )
 
-  } else {
-    variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
+  # replcates
+  qq <- apply(ww, 2, function(wi) gei1_efun( incvar , wi ) + gei0_efun( incvar , wi ) )
 
-    variance <- as.matrix( variance )
-  }
-  colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+  # variance
+  variance <- survey::svrVar( qq , design$scale, design$rscales, mse = design$mse, coef = matrix( ttl.jdiv, within.jdiv, between.jdiv ) )
+
+  # outrput object
+  names( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
   class(rval) <- c( "cvystat" , "svrepstat" )
   attr(rval, "var") <- variance
   attr(rval, "statistic") <- "j-divergence"
