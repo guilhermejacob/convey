@@ -159,6 +159,11 @@ svyjdivdec.survey.design <-
       mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
       sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
     }
+    jdiv_efun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
+    }
     gei0_linfun <- function( y , w ) {
       N <- sum( w )
       mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
@@ -170,6 +175,13 @@ svyjdivdec.survey.design <-
       mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
       gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
       ifelse( w > 0 , (1/N) * ( ( y / mu ) * log( y / mu ) - gei1 ) - (1/mu) *( gei1 + 1 ) * ( y - mu ) / N , 0 )
+    }
+    jdiv_linfun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+      jdiv <- sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
+      ifelse( w > 0 , (1/N) * ( ( y / mu - 1 ) * log( y / mu ) - jdiv ) - ( gei1 / mu ) * ( y - mu ) / N , 0 )
     }
     phi_efun <- function( y , w , alpha , ind ) {
       N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
@@ -192,7 +204,7 @@ svyjdivdec.survey.design <-
     }
 
     # estimates
-    ttl.jdiv <- gei1_efun( incvar , w ) + gei0_efun( incvar , w )
+    ttl.jdiv <- jdiv_efun( incvar , w )
     within.jdiv  <- apply( gmat, 2 , function( ind ) {
       phi_efun( incvar , w , alpha = 0 , ind = ind ) * gei0_efun( incvar , w * ind ) +
         phi_efun( incvar , w , alpha = 1 , ind = ind ) * gei1_efun( incvar , w * ind )
@@ -201,7 +213,7 @@ svyjdivdec.survey.design <-
     between.jdiv <- ttl.jdiv - within.jdiv
 
     # linearization
-    ttl.jdiv.lin <- gei0_linfun( incvar , w ) + gei1_linfun( incvar , w )
+    ttl.jdiv.lin <- matrix( jdiv_linfun( incvar , w ) )
     within.jdiv.lin  <- apply( gmat , 2 , function( ind ) {
       phi0 <- phi_efun( incvar , w , alpha = 0 , ind = ind )
       gei0 <- gei0_efun( incvar , w * ind )
@@ -215,13 +227,14 @@ svyjdivdec.survey.design <-
       pt1 <- gei1 * phi1_lin + gei1_lin * phi1
       ifelse( w > 0 , pt0 + pt1 , 0 )
     } )
-    within.jdiv.lin <- rowSums( within.jdiv.lin )
+    within.jdiv.lin <- matrix( rowSums( within.jdiv.lin ) )
     between.jdiv.lin <- ttl.jdiv.lin - within.jdiv.lin
 
-    lin.matrix <- matrix( data = c(ttl.jdiv.lin, within.jdiv.lin, between.jdiv.lin), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
+    lin.matrix <- do.call( cbind , list(ttl.jdiv.lin, within.jdiv.lin, between.jdiv.lin ) )
+    colnames( lin.matrix ) <-  c( "total", "within", "between" )
+    variance <- survey::svyrecvar( lin.matrix / design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
 
     estimates <- matrix( c( ttl.jdiv, within.jdiv, between.jdiv ), dimnames = list( c( "total", "within", "between" ) ) )[,]
-    variance <- survey::svyrecvar( lin.matrix/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
 
     rval <- list( estimate = estimates )
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -250,6 +263,11 @@ svyjdivdec.svyrep.design <-
       N <- sum( w )
       mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
       sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+    }
+    jdiv_efun <- function( y , w ) {
+      N <- sum( w )
+      mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+      sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
     }
     phi_efun <- function( y , w , alpha , ind ) {
       N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
@@ -297,8 +315,8 @@ svyjdivdec.svyrep.design <-
     ww <- weights(design, "analysis")
 
     # Total
-    ttl.jdiv <- gei1_efun( incvar , ws ) + gei0_efun( incvar , ws )
-    qq.ttl.jdiv <- apply(ww, 2, function(wi) gei1_efun( incvar , wi ) + gei0_efun( incvar , wi ) )
+    ttl.jdiv <- jdiv_efun( incvar , ws )
+    qq.ttl.jdiv <- apply(ww, 2, function(wi) jdiv_efun( incvar , wi ) )
 
     # within
     within.jdiv <- sum( apply( gmat, 2 , function( ind ) {

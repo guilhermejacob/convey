@@ -120,44 +120,34 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
   if ( any( incvar[ w > 0 ] <= 0 , na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
   # internal functions
-  gei0_efun <- function( y , w ) {
+  jdiv_efun <- function( y , w ) {
     N <- sum( w )
     mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+    sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
   }
-  gei1_efun <- function( y , w ) {
-    N <- sum( w )
-    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
-  }
-  gei0_linfun <- function( y , w ) {
-    N <- sum( w )
-    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    gei0 <- - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
-    ifelse( w > 0 , -(1/N) * ( log( y / mu ) + gei0 ) + (1/mu) * ( y - mu ) / N , 0 )
-  }
-  gei1_linfun <- function( y , w ) {
+  jdiv_linfun <- function( y , w ) {
     N <- sum( w )
     mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
     gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
-    ifelse( w > 0 , (1/N) * ( ( y / mu ) * log( y / mu ) - gei1 ) - (1/mu) *( gei1 + 1 ) * ( y - mu ) / N , 0 )
+    jdiv <- sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
+    ifelse( w > 0 , (1/N) * ( ( y / mu - 1 ) * log( y / mu ) - jdiv ) - ( gei1 / mu ) * ( y - mu ) / N , 0 )
   }
 
   # estimates
-  rval <- gei1_efun( incvar , w ) + gei0_efun( incvar , w )
+  rval <- jdiv_efun( incvar , w )
 
   # linearization
-  ttl.jdiv.lin <- gei0_linfun( incvar , w ) + gei1_linfun( incvar , w )
+  lin <- jdiv_linfun( incvar , w )
 
   # variance
-  variance <- survey::svyrecvar( ttl.jdiv.lin/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
+  variance <- survey::svyrecvar( lin/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
 
   # output object
   colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
   class(rval) <- c( "cvystat" , "svystat" )
   attr(rval, "statistic") <- "j-divergence"
   attr(rval, "var") <- variance
-  attr(rval, "lin") <- ttl.jdiv.lin
+  attr(rval, "lin") <- lin
 
   rval
 
@@ -169,15 +159,10 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
 svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
 
   # aux funs
-  gei0_efun <- function( y , w ) {
+  jdiv_efun <- function( y , w ) {
     N <- sum( w )
     mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
-  }
-  gei1_efun <- function( y , w ) {
-    N <- sum( w )
-    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+    sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
   }
 
   ws <- weights(design, "sampling")
@@ -208,10 +193,10 @@ svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
   ww <- weights(design, "analysis")
 
   # estimate
-  rval <- gei1_efun( incvar , ws ) + gei0_efun( incvar , ws )
+  rval <- jdiv_efun( incvar , ws )
 
   # replcates
-  qq <- apply(ww, 2, function(wi) gei1_efun( incvar , wi ) + gei0_efun( incvar , wi ) )
+  qq <- apply(ww, 2, function(wi) jdiv_efun( incvar , wi ) )
 
   # variance
   variance <- survey::svrVar( qq , design$scale, design$rscales, mse = design$mse, coef = matrix( ttl.jdiv, within.jdiv, between.jdiv ) )
