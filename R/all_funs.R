@@ -153,6 +153,65 @@ T_fn <-
 		sum( weights * x^gamma * log( x ) )
 	}
 
+# Auxilliary functions for J-divergence decomposition
+gei0_efun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+}
+gei1_efun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+}
+jdiv_efun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
+}
+gei0_linfun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  gei0 <- - sum( ifelse( w > 0 , w * log( y / mu ) , 0 ) ) / N
+  ifelse( w > 0 , -(1/N) * ( log( y / mu ) + gei0 ) + (1/mu) * ( y - mu ) / N , 0 )
+}
+gei1_linfun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+  ifelse( w > 0 , (1/N) * ( ( y / mu ) * log( y / mu ) - gei1 ) - (1/mu) *( gei1 + 1 ) * ( y - mu ) / N , 0 )
+}
+jdiv_efun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
+}
+jdiv_linfun <- function( y , w ) {
+  N <- sum( w )
+  mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
+  gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
+  jdiv <- sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
+  ifelse( w > 0 , (1/N) * ( ( y / mu - 1 ) * log( y / mu ) - jdiv ) - ( gei1 / mu ) * ( y - mu ) / N , 0 )
+}
+phi_efun <- function( y , w , alpha , ind ) {
+  N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
+  N <- sum( ifelse( w > 0 , w , 0 ) )
+  Y_j <- sum( ifelse( ( ind * w ) > 0 , w * y , 0 ) )
+  Y <- sum( ifelse( w > 0 , w * y , 0 ) )
+  sest <- Y_j / Y ; pest <- N_j / N
+  sest^alpha * pest^( 1 - alpha )
+}
+phi_linfun <- function( y , w , alpha , ind ) {
+  N_j <- sum( ifelse( ( ind * w ) > 0 , w , 0 ) )
+  N <- sum( ifelse( w > 0 , w , 0 ) )
+  Y_j <- sum( ifelse( ( ind * w ) > 0 , w * y , 0 ) )
+  Y <- sum( ifelse( w > 0 , w * y , 0 ) )
+  sest <- Y_j / Y ; pest <- N_j / N
+  phiest <- sest^alpha * pest^( 1 - alpha )
+  slin <- ifelse( w > 0 , (1/Y) * ( ind * y - sest * y ) , 0 )
+  plin <- ifelse( w > 0 , (1/N) * ( ind - pest ) , 0 )
+  ifelse( w  > 0 , phiest * ( alpha * slin / sest + ( 1 - alpha ) * plin / pest ) , 0 )
+}
 
 
 # cvystat print method

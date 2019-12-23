@@ -119,20 +119,6 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
 
   if ( any( incvar[ w > 0 ] <= 0 , na.rm = TRUE) ) stop( "The J-divergence index is defined for strictly positive incomes only." )
 
-  # internal functions
-  jdiv_efun <- function( y , w ) {
-    N <- sum( w )
-    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
-  }
-  jdiv_linfun <- function( y , w ) {
-    N <- sum( w )
-    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    gei1 <- sum( ifelse( w > 0 , w * ( y / mu ) * log( y / mu ) , 0 ) ) / N
-    jdiv <- sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
-    ifelse( w > 0 , (1/N) * ( ( y / mu - 1 ) * log( y / mu ) - jdiv ) - ( gei1 / mu ) * ( y - mu ) / N , 0 )
-  }
-
   # estimates
   rval <- jdiv_efun( incvar , w )
 
@@ -157,13 +143,6 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, ... ) {
 #' @rdname svyjdiv
 #' @export
 svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, ... ) {
-
-  # aux funs
-  jdiv_efun <- function( y , w ) {
-    N <- sum( w )
-    mu <- sum( ifelse( w > 0 , w * y , 0 ) ) / N
-    sum( ifelse( w > 0 , w * ( y / mu - 1 ) * log( y / mu ) , 0 ) ) / N
-  }
 
   ws <- weights(design, "sampling")
   incvar <- model.frame( formula , design$variables, na.action = na.pass)[ , ]
