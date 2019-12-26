@@ -26,4 +26,5 @@ Suggests:
     RODBC,
     RSQLite,
     srvyr
-RoxygenNote: 6.0.1
+RoxygenNote: 7.0.2
+Encoding: UTF-8

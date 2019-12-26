@@ -17,7 +17,10 @@
 #'
 #' @seealso \code{\link{svyjdivdec}} , \code{\link{svygei}}
 #'
-#' @references Nicholas Rohde (2016). J-divergence measurements of economic inequality.
+#' @references Guilherme Jacob (2019). Decomposição da J-divergência por subgrupos de condição de
+#' formalidade e grupos de ocupações: Brasil, 2014-2018. Mimeo. 2019.
+#'
+#' Nicholas Rohde (2016). J-divergence measurements of economic inequality.
 #' J. R. Statist. Soc. A, v. 179, Part 3 (2016), pp. 847-870.
 #' URL \url{http://onlinelibrary.wiley.com/doi/10.1111/rssa.12153/abstract}.
 #'

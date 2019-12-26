@@ -9,11 +9,9 @@
 \usage{
 svyjdivdec(formula, subgroup, design, ...)
 
-\method{svyjdivdec}{survey.design}(formula, subgroup, design,
-  na.rm = FALSE, ...)
+\method{svyjdivdec}{survey.design}(formula, subgroup, design, na.rm = FALSE, ...)
 
-\method{svyjdivdec}{svyrep.design}(formula, subgroup, design,
-  na.rm = FALSE, ...)
+\method{svyjdivdec}{svyrep.design}(formula, subgroup, design, na.rm = FALSE, ...)
 
 \method{svyjdivdec}{DBIsvydesign}(formula, subgroup, design, ...)
 }
@@ -105,6 +103,9 @@ dbDisconnect( conn , shutdown = TRUE )
 
 }
 \references{
+Guilherme Jacob (2019). Decomposição da J-divergência por subgrupos de condição de
+formalidade e grupos de ocupações: Brasil, 2014-2018. Mimeo. 2019.
+
 Anthony F. Shorrocks (1984). Inequality decomposition
 by population subgroups. \emph{Econometrica}, v. 52, n. 6, 1984, pp. 1369-1385.
 URL \url{http://www.jstor.org/stable/1913511}.
