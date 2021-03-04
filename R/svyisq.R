@@ -62,13 +62,13 @@
 #' dbd_eusilc <-
 #' 	svydesign(
 #' 		ids = ~rb030 ,
-#' 		strata = ~db040 , 
+#' 		strata = ~db040 ,
 #' 		weights = ~rb050 ,
 #' 		data="eusilc",
 #' 		dbname=dbfile,
 #' 		dbtype="SQLite"
 #' 	)
-#' 
+#'
 #' dbd_eusilc <- convey_prep( dbd_eusilc )
 #'
 #' svyisq( ~ eqincome , design = dbd_eusilc, .20 )
@@ -94,43 +94,55 @@ svyisq <-
 svyisq.survey.design <-
 	function(formula, design, alpha, quantile = FALSE, na.rm = FALSE,...) {
 
+	  # test for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
 
+	  # collect income data
 		incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+		# treat missing values
 		if(na.rm){
 			nas<-is.na(incvar)
 			design<-design[!nas,]
 			if (length(nas) > length(design$prob)) incvar <- incvar[!nas] else incvar[nas] <- 0
 		}
 
+		# domain indices
 		ind <- names(design$prob)
-		w <- 1/design$prob
-		N <- sum(w)
-		h <- h_fun(incvar, w)
 
+		# collect weights
+		w <- 1/design$prob
+
+		# population size
+		N <- sum(w)
+
+		# estimate quantiles
 		q_alpha <- survey::svyquantile(x = formula, design = design, quantiles = alpha, method = "constant", na.rm = na.rm,...)
 		q_alpha <- as.vector(q_alpha)
 
-		Fprime0 <- densfun(formula = formula, design = design, q_alpha, h=h, FUN = "F", na.rm=na.rm)
-		Fprime1 <- densfun(formula = formula, design = design, q_alpha, FUN = "big_s", na.rm = na.rm)
-
+		# compute point estimate
 		rval <- sum((incvar<=q_alpha)*incvar * w)
 
+		# linearization
+		h <- h_fun(incvar, w)
+		Fprime0 <- densfun(formula = formula, design = design, q_alpha, h=h, FUN = "F", na.rm=na.rm)
+		Fprime1 <- densfun(formula = formula, design = design, q_alpha, FUN = "big_s", na.rm = na.rm)
 		iq <- -( 1 / ( N * Fprime0 ) ) * ( ( incvar <= q_alpha ) - alpha )
-
 		isqalpha1 <- incvar * (incvar <= q_alpha)
 		isqalpha <- isqalpha1 + Fprime1 * iq
-		variance <- survey::svyrecvar(isqalpha/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
 
+		# compute variance
+		variance <- survey::svyrecvar( isqalpha/design$prob , design$cluster , design$strata , design$fpc , postStrata = design$postStrata )
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+		# build result object
 		class(rval) <- c( "cvystat" , "svystat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "isq"
 		attr(rval, "lin") <- isqalpha
 		if(quantile) attr(rval, "quantile") <- q_alpha
-
 		rval
+
 	}
 
 #' @rdname svyisq
@@ -138,43 +150,49 @@ svyisq.survey.design <-
 svyisq.svyrep.design <-
 	function(formula, design, alpha,quantile = FALSE, na.rm = FALSE,...){
 
+	  # check for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
 
+	  # collect income data
 		incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
-		if(na.rm){
-			nas<-is.na(incvar)
-			design<-design[!nas,]
+		# treat missing values
+		if( na.rm ) {
+			nas <- is.na( incvar )
+			design <- design[!nas,]
 			if (length(nas) > length(design$prob)) incvar <- incvar[!nas] else incvar[nas] <- 0
 		}
 
+		# estimation function
 		compute_isq <-
 			function(x, w, alpha){
 				q_alpha <- computeQuantiles( x , w , alpha )
 				c( q_alpha , sum( x * ( x <= q_alpha ) * w ) )
 			}
 
+		# point estimate
 		rval_isq <- compute_isq(incvar, alpha = alpha, w = weights(design, "sampling"))
-
 		rval <- rval_isq[2]
 
+		# collect analysis weights
 		ww <- weights(design, "analysis")
 
+		# compute replicates
 		qq <- apply(ww, 2, function(wi) compute_isq(incvar, wi, alpha = alpha)[2])
 
-		if(anyNA(qq))variance <- NA
-		else variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
-
+		# compute variance
+		if(anyNA(qq))variance <- NA else variance <- survey::svrVar( qq , design$scale , design$rscales , mse = design$mse , coef = rval )
 		variance <- as.matrix( variance )
-
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+		# build result object
 		class(rval) <- c( "cvystat" , "svrepstat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "isq"
 		attr(rval, "lin") <- NA
 		if(quantile)attr(rval, "quantile") <- rval_isq[1]
-
 		rval
+
 	}
 
 #' @rdname svyisq

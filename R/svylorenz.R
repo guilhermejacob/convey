@@ -218,8 +218,10 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
 
   }
 
+  # collect income data
   incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+  # treat missing values
   if (na.rm) {
     nas <- is.na(incvar)
     design <- design[nas == 0, ]
@@ -228,16 +230,20 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
     else incvar[nas > 0] <- 0
   }
 
+  # colelct weights
   w <- 1/design$prob
 
+  # compute
   ordincvar<-order(incvar)
   w <- w[ordincvar]
   incvar <- incvar[ordincvar]
 
+  # filter domain
   incvar <- incvar[w != 0]
   w <- w[w != 0]
-
   average <- sum( w * incvar ) / sum( w )
+
+  # treat remainig missing
   if ( is.na(average) ) {
     variance <- as.matrix(NA)
     cis <- array( rbind(rep(NA, length(quantiles)),rep(NA, length(quantiles))), dim = c(2, length(quantiles)), dimnames = list( c( "(lower", "upper)" ), as.character(quantiles) ) )
@@ -249,71 +255,61 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
     return(rval)
   }
 
+  # calculate estimates
   p <- NULL
   L.p <- NULL
-
   L.p <- as.numeric( lapply( quantiles, function(x) wtd.psum(x = incvar, weights = w, q = x ) ) ) / sum( w * incvar )
-
   GL.p <- L.p * average
 
+  # calculate empirical curve
   if (empirical) {
     E_p <- ( 2*cumsum(w[w != 0]) - w[w != 0] ) / ( 2*sum(w[w != 0]) )
     E_L.p <- cumsum(w[w != 0]*incvar[w != 0])/sum(w[w != 0]*incvar[w != 0])
     E_GL.p <- E_L.p[w != 0] * average
   }
 
+  # population size
   N <- sum( w )
-  var <- NULL
-  lin_mat <- matrix( NA, nrow = length( ordincvar ), ncol = length(quantiles) )
+
+  # compute lineraized variables
+  linmat <- matrix( NA, nrow = length( ordincvar ), ncol = length(quantiles) )
   for ( pc in quantiles ) {
     i <- match( pc, quantiles )
-    pc
-
     if ( pc > 0 & pc < 1 ) {
-
       quant <- wtd.qtl( x = incvar, q = pc, weights = w )
       s.quant <- L.p[i]
-
       u_i <- 1/design$prob
       u_i[ u_i > 0 ] <- ( 1 / ( N * average ) ) * ( ( ( incvar - quant ) * ( incvar <= quant ) ) + ( pc * quant ) - ( incvar * s.quant ) )
       u_i <- u_i[ sort(ordincvar) ]
-
-      lin_mat[ , i ] <- u_i
-
-      rm(quant, s.quant , u_i )
-
+      linmat[ , i ] <- u_i
     } else if ( pc == 0 ) {
-
       L.p[i] <- 0
-
-      lin_mat[ , i ] <- 0
-
+      linmat[ , i ] <- 0
     } else if ( pc == 1 ) {
-
       L.p[i] <- 1
-
-      lin_mat[ , i] <- 0
+      linmat[ , i] <- 0
     }
-
-    rm( i, pc )
-
   }
-  var <- survey::svyrecvar( lin_mat/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
 
-  se <- sqrt(diag(var))
+  # compute variance
+  variance <- survey::svyrecvar( linmat/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+  se <- sqrt( diag( variance ) )
+  rownames( variance ) <- colnames( variance ) <- quantiles
 
-
+  # compute CIs
   CI.L <- L.p - se * qnorm( alpha, mean = 0, sd = 1, lower.tail = FALSE )
   CI.U <- L.p + se * qnorm( alpha, mean = 0, sd = 1, lower.tail = FALSE )
-
   cis <- structure( rbind( CI.L,CI.U ), .Dim = c(2L, length(quantiles), 1L), .Dimnames = list(c("(lower", "upper)"), as.character(quantiles),  as.character(formula)[2]))
 
+  # build result object
   rval <- t( matrix( data = L.p, nrow = length(quantiles), dimnames = list( as.character( quantiles ), as.character(formula)[2] ) ) )
   rval <- list(quantiles = rval, CIs = cis)
-  attr(rval, "var") <- var
+  attr(rval, "var") <- variance
   attr(rval, "SE") <- se
+  attr(rval, "lin") <- linmat
   class(rval) <- c( "cvyquantile" , "svyquantile" )
 
+  # plot data
   if ( plot ) {
 
     plot_dots <- list( ... )
@@ -357,10 +353,10 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
 
   }
 
+  # return final object
   return(rval)
 
 }
-
 
 #' @rdname svylorenz
 #' @export
@@ -433,23 +429,27 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     as.numeric(res)
   }
 
+  # collect income data
   incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+  # treat missing values
   if(na.rm){
     nas<-is.na(incvar)
     design<-design[!nas,]
+    incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
   }
 
-  incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+  # collect sampling and analysis weights
   ws <- weights(design, "sampling")
   ww <- weights(design, "analysis")
 
+  # reorder
   ordincvar <- order( incvar )
-
   ws <- ws[ ordincvar ]
   ww <- ww[ ordincvar, ]
   incvar <- incvar[ ordincvar ]
 
+  # treat remaining missing
   if ( any( is.na( incvar [ ws > 0 ] ) ) ) {
     variance <- as.matrix(NA)
     cis <- array( rbind(rep(NA, length(quantiles)),rep(NA, length(quantiles))), dim = c(2, length(quantiles)), dimnames = list( c( "(lower", "upper)" ), as.character(quantiles) ) )
@@ -457,14 +457,17 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     rval <- list(quantiles = rval, CIs = cis)
     attr(rval, "SE") <- rep(NA, length(quantiles))
     class(rval) <- c( "cvyquantile" , "svyquantile" )
-
     return(rval)
   }
 
+  # compute point estimates
   L.p <- t( as.matrix( lapply_wtd.psum( x = incvar, qs = quantiles, weights = ws ) ) )
   rval <- t( matrix( data = L.p, dimnames = list( as.character( quantiles ) ) ) )
+
+  # compute replicates
   qq <- apply(ww, 2, function(wi) lapply_wtd.psum(x = incvar, qs = quantiles, weights = wi ) )
 
+  # compute variance
   if ( any(is.na(qq))) {
     variance <- as.matrix(NA)
     cis <- array( rbind(rep(NA, length(quantiles)),rep(NA, length(quantiles))), dim = c(2, length(quantiles)), dimnames = list( c( "(lower", "upper)" ), as.character(quantiles) ) )
@@ -472,14 +475,16 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     rval <- list(quantiles = rval, CIs = cis)
     attr(rval, "SE") <- rep(NA, length(quantiles))
     class(rval) <- c( "cvyquantile" , "svyquantile" )
-
     return(rval)
   }
-
   variance <- survey::svrVar( t(qq), design$scale, design$rscales, mse = design$mse, coef = rval )
+  rownames( variance ) <- colnames( variance ) <- quantiles
+
+  # set up additional estimates
   se <- sqrt(diag(variance))
   se[c(1, length(quantiles))] <- 0
 
+  # empirical curve
   if (empirical) {
     ordincvar <- order(incvar)
     incvar <- incvar[ordincvar]
@@ -488,17 +493,19 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     E_L.p <- cumsum(ws[ws != 0]*incvar[ws != 0])/sum(ws[ws != 0]*incvar[ws != 0])
   }
 
+  # compute CIs
   CI.L <- as.numeric( L.p - se * qnorm( alpha, mean = 0, sd = 1, lower.tail = FALSE ) )
   CI.U <- as.numeric( L.p + se * qnorm( alpha, mean = 0, sd = 1, lower.tail = FALSE ) )
-
   cis <- structure(rbind(CI.L,CI.U), .Dim = c(2L, length(quantiles), 1L), .Dimnames = list(c("(lower", "upper)"), as.character(quantiles),  as.character(formula)[2]))
+
+  # set up result object
   rval <- t( matrix( data = L.p, nrow = length(quantiles), dimnames = list( as.character( quantiles ), as.character(formula)[2] ) ) )
   rval <- list(quantiles = rval, CIs = cis)
-  attr(rval, "var") <- variance
-  attr(rval, "SE") <- se
-  class(rval) <- c( "cvyquantile" , "svyquantile" )
+  attr( rval , "var") <- variance
+  attr( rval , "SE") <- se
+  class( rval ) <- c( "cvyquantile" , "svyquantile" )
 
-
+  # plot curve
   if ( plot ) {
 
     plot_dots <- list( ... )
@@ -542,6 +549,7 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
 
   }
 
+  # return final result object
   return(rval)
 
 }
@@ -551,7 +559,6 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
 svylorenz.DBIsvydesign <- function (formula, design, ...) {
 
   design$variables <- getvars(formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
-
   NextMethod("svylorenz", design)
 
 }

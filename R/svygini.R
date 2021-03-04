@@ -95,18 +95,20 @@ svygini <-
 svygini.survey.design <-
 	function(formula, design, na.rm=FALSE, ...) {
 
-		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
-
+	  # collect income data
 		incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+		# treat missing values
 		if (na.rm) {
 			nas <- is.na(incvar)
 			design <- design[nas == 0, ]
 			if (length(nas) > length(design$prob)) incvar <- incvar[nas == 0] else incvar[nas > 0] <- 0
 		}
 
+		# colelct sampling weights
 		w <- 1/design$prob
 
+		# collecct indices and reorder
 		ordincvar <- order(incvar)
 		w <- w[ordincvar]
 		incvar <- incvar[ordincvar]
@@ -134,17 +136,19 @@ svygini.survey.design <-
 		lingini <- as.vector( GINI$lin )
 		if(sum(w==0) > 0)  lingini <- lingini*(w!=0)
 		lingini <- lingini[order(ordincvar)]
+
+		# compute variance
+		variance <- survey::svyrecvar( lingini/design$prob , design$cluster , design$strata , design$fpc , postStrata = design$postStrata )
+
+		# build rresult object
 		rval <- GINI$value
-
-		variance <- survey::svyrecvar(lingini/design$prob, design$cluster,design$strata, design$fpc, postStrata = design$postStrata)
-
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class(rval) <- c( "cvystat" , "svystat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "gini"
 		attr(rval,"lin")<- lingini
-
 		rval
+
 	}
 
 #' @rdname svygini
@@ -152,21 +156,23 @@ svygini.survey.design <-
 svygini.svyrep.design <-
 	function(formula, design,na.rm=FALSE, ...) {
 
-		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
-
+	  # collect data
 		df <- model.frame(design)
 		incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
-		if(na.rm){
-			nas<-is.na(incvar)
-			design<-design[!nas,]
-			df <- model.frame(design)
-			incvar <- incvar[!nas]
+		# treat missing values
+		if( na.rm ) {
+			nas <- is.na( incvar )
+			design <- design[!nas,]
+			df <- model.frame( design )
+			incvar <- incvar[ !nas ]
 		}
 
-
+		# gini computation function
 		ComputeGini <-
 			function(x, w) {
+			  x <- x[w>0]
+			  w <- w[w>0]
 				w <- w[order(x)]
 				x <- x[order(x)]
 				N <- sum(w)
@@ -178,24 +184,29 @@ svygini.svyrep.design <-
 				(Num/Den) - 1
 			}
 
+		# colelct sampling weights
 		ws <- weights(design, "sampling")
 
+		# compute point estimate
 		rval <- ComputeGini(incvar, ws)
 
+		# collect analysis weights
 		ww <- weights(design, "analysis")
 
+		# compute replicates
 		qq <- apply(ww, 2, function(wi) ComputeGini(incvar, wi))
-		if(anyNA(qq))variance <- NA
-		else variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
 
+		# compute variance
+		if ( anyNA(qq) ) variance <- NA else variance <- survey::svrVar( qq , design$scale , design$rscales , mse = design$mse , coef = rval )
 		variance <- as.matrix( variance )
 
+		# build result object
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-		class(rval) <- c( "cvystat" , "svrepstat" ) 
+		class(rval) <- c( "cvystat" , "svrepstat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "gini"
-
 		rval
+
 	}
 
 
@@ -203,25 +214,6 @@ svygini.svyrep.design <-
 #' @export
 svygini.DBIsvydesign <-
 	function (formula, design, ...){
-
-		if (!( "logical" %in% class(attr(design, "full_design"))) ){
-
-			full_design <- attr( design , "full_design" )
-
-			full_design$variables <-
-				getvars(
-					formula,
-					attr( design , "full_design" )$db$connection,
-					attr( design , "full_design" )$db$tablename,
-					updates = attr( design , "full_design" )$updates,
-					subset = attr( design , "full_design" )$subset
-				)
-
-			attr( design , "full_design" ) <- full_design
-
-			rm( full_design )
-
-		}
 
 		design$variables <-
 			getvars(

@@ -139,8 +139,10 @@ svyatk <-
 svyatk.survey.design <-
 	function ( formula, design, epsilon = 1, na.rm = FALSE, ... ) {
 
+	  # collect data
 		incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+		# treat missing values
 		if (na.rm) {
 			nas <- is.na(incvar)
 			design <- design[nas == 0, ]
@@ -149,8 +151,11 @@ svyatk.survey.design <-
 			else incvar[nas > 0] <- 0
 		}
 
+		# collect weights
 		w <- 1/design$prob
-		if ( any( is.na(incvar [w != 0]) ) ) {
+
+		# treat missing
+		if ( any( is.na( incvar [w != 0] ) ) ) {
 			rval <- NA
 			variance <- as.matrix(NA)
 			colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -161,13 +166,13 @@ svyatk.survey.design <-
 			return(rval)
 		}
 
-		if ( any(incvar[w != 0] <= 0) ) stop( "The Atkinson Index is defined for strictly positive variables only.  Negative and zero values not allowed." )
+		# check for strictly positive incomes
+		if ( any(incvar[w != 0] <= 0) ) stop( "The Atkinson indices are defined for strictly positive variables only.\nNegative and zero values not allowed." )
 
-		w <- 1/design$prob
+		# compute value
+		rval <- ComputeAtk( x = incvar, weights = w, epsilon = epsilon )
 
-		rval <- NULL
-		rval <- calc.atkinson( x = incvar, weights = w, epsilon = epsilon )
-
+		# treat NA
 		if ( is.na(rval) ) {
 			variance <- as.matrix(NA)
 			colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -178,6 +183,7 @@ svyatk.survey.design <-
 			return(rval)
 		}
 
+		# calculate influence functions
 		if ( epsilon != 1 ) {
 
 			v <-
@@ -210,17 +216,20 @@ svyatk.survey.design <-
 
 		}
 
+		# treat out of sample
 		v[w == 0] <- 0
 
-		variance <- survey::svyrecvar(v/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
+		# compute variance
+		variance <- survey::svyrecvar( v/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
 
+		# build result object
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class(rval) <- c( "cvystat" , "svystat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "atkinson"
 		attr(rval,"epsilon")<- epsilon
-
 		rval
+
 	}
 
 
@@ -229,8 +238,10 @@ svyatk.survey.design <-
 svyatk.svyrep.design <-
 	function(formula, design, epsilon = 1, na.rm=FALSE, ...) {
 
+	  # collect income variable
 		incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+		# treat missings
 		if(na.rm){
 			nas<-is.na(incvar)
 			design<-design[!nas,]
@@ -238,15 +249,22 @@ svyatk.svyrep.design <-
 			incvar <- incvar[!nas]
 		}
 
+		# collect sampling weights
 		ws <- weights(design, "sampling")
 
-		if ( any( incvar[ws != 0] <= 0, na.rm = TRUE ) ) stop( "The Atkinson Index is defined for strictly positive variables only.  Negative and zero values not allowed." )
+		# check for strictly positive incomes
+		if ( any( incvar[ws != 0] <= 0, na.rm = TRUE ) ) stop( "The Atkinson indices are defined for strictly positive variables only.\nNegative and zero values not allowed." )
 
-		ws <- weights(design, "sampling")
-		rval <- calc.atkinson( x = incvar, weights = ws, epsilon = epsilon)
+		# compute point estimate
+		rval <- ComputeAtk( x = incvar, weights = ws, epsilon = epsilon)
+
+		# collect analysis weights
 		ww <- weights(design, "analysis")
-		qq <- apply(ww, 2, function(wi) calc.atkinson(incvar, wi, epsilon = epsilon))
 
+		# compute replicates
+		qq <- apply( ww, 2 , function(wi) ComputeAtk( incvar , wi , epsilon = epsilon ) )
+
+		# treat missing
 		if ( any(is.na(qq))) {
 
 			variance <- as.matrix(NA)
@@ -258,20 +276,19 @@ svyatk.svyrep.design <-
 
 			return(rval)
 
-		} else {
-
-			variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
-
-			variance <- as.matrix( variance )
-
 		}
 
+		# compute variance
+		variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
+		variance <- as.matrix( variance )
+
+		# build result object
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class(rval) <- c( "cvystat" , "svrepstat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "atkinson"
 		attr(rval,"epsilon")<- epsilon
-		return(rval)
+		rval
 
 	}
 
@@ -282,37 +299,29 @@ svyatk.DBIsvydesign <-
 	function (formula, design, ...) {
 
 	  design$variables <- getvars( formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset )
-
 		NextMethod("svyatk", design)
+
 	}
 
-
-
-
-
-calc.atkinson <-
+# auxilliary function
+ComputeAtk <-
 	function( x, weights, epsilon ) {
 
 		x <- x[ weights != 0 ]
-
 		weights <- weights[ weights != 0 ]
 
 		if ( epsilon == 1 ) {
-
 			result.est <-
 				1 -
 				U_fn( x , weights , 0 ) *
 				U_fn( x , weights , 1 )^( -1 ) *
 				exp( T_fn( x , weights , 0 ) / U_fn( x , weights , 0 ) )
-
 		} else {
-
 			result.est <-
 				1 -
 				( U_fn( x , weights , 0 )^( -epsilon / ( 1 - epsilon ) ) ) *
 				U_fn( x , weights , 1 - epsilon )^( 1 / ( 1 - epsilon ) )  / U_fn( x , weights , 1 )
-
 		}
-
 		result.est
+
 	}

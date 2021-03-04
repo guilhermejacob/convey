@@ -124,7 +124,7 @@ svyfgt <-
 
     if( !( 'g' %in% names(list(...)) ) ) stop( "g= parameter must be specified" )
 
-    if( !is.na( list(...)[["g"]] ) && !( ( list(...)[["g"]] == 0 ) | ( list(...)[["g"]] >= 1 ) ) ) stop( "g= must be 0 to estimate the headcount ratio or >=1 to estimate the poverty index" )
+    if( !is.na( list(...)[["g"]] ) && !( ( list(...)[["g"]] >= 0 ) ) ) stop( "g= must be greater or equal to 0" )
 
     if( 'type_thresh' %in% names( list( ... ) ) && !( list(...)[["type_thresh"]] %in% c( 'relq' , 'abs' , 'relm' ) ) ) stop( 'type_thresh= must be "relq" "relm" or "abs".  see ?svyfgt for more detail.' )
 
@@ -139,14 +139,15 @@ svyfgt <-
 svyfgt.survey.design <-
   function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, ...){
 
+    # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
 
+    # check for threshold type
     if( type_thresh == "abs" & is.null( abs_thresh ) ) stop( "abs_thresh= must be specified when type_thresh='abs'" )
 
     # if the class of the full_design attribute is just a TRUE, then the design is
     # already the full design.  otherwise, pull the full_design from that attribute.
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
-
 
     #  survey design h function
     h <- function( y , thresh , g ) ( ( ( thresh - y ) / thresh )^g ) * ( y <= thresh )
@@ -154,43 +155,50 @@ svyfgt.survey.design <-
     # ht function
     ht <- function( y , thresh , g ) ( g * ( ( ( thresh - y ) / thresh )^( g - 1 ) ) * ( y / ( thresh^2 ) ) ) * ( y <= thresh )
 
-    # domain
+    # collect incomes from domain sample
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+    # treat missing values
     if(na.rm){
       nas<-is.na(incvar)
       design<-design[!nas,]
       if (length(nas) > length(design$prob))incvar <- incvar[!nas] else incvar[nas] <- 0
     }
 
+    # collect domain sample weights
     w <- 1/design$prob
 
+    # create domain indice
     if( is.null( names( design$prob ) ) ) ind <- as.character( seq( length( design$prob ) ) ) else ind <- names(design$prob)
 
+    # calculate domain population size
     N <- sum(w)
 
     # if the class of the full_design attribute is just a TRUE, then the design is
     # already the full design.  otherwise, pull the full_design from that attribute.
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
 
+    # collect incomes from full sample
     incvec <- model.frame(formula, full_design$variables, na.action = na.pass)[[1]]
 
+    # treat missing values
     if(na.rm){
       nas<-is.na(incvec)
       full_design<-full_design[!nas,]
       if (length(nas) > length(full_design$prob)) incvec <- incvec[!nas] else incvec[nas] <- 0
     }
 
+    # collect full samples weights
     wf <- 1/full_design$prob
 
+    # create full sample indices
     if( is.null( names( full_design$prob ) ) ) ncom <- as.character( seq( length( full_design$prob ) ) ) else ncom <- names(full_design$prob)
 
+    # calculate h from full sample
     htot <- h_fun(incvec, wf)
     if (sum(1/design$prob==0) > 0) ID <- 1*(1/design$prob!=0) else ID <- 1 * ( ncom %in% ind )
 
-
-    # linearization
-
+    # calculate linearized variable
     if( type_thresh == 'relq' ){
 
       ARPT <- svyarpt(formula = formula, full_design, quantiles=quantiles, percent=percent,  na.rm=na.rm, ...)
@@ -207,7 +215,6 @@ svyfgt.survey.design <-
       } else fgtlin <-ID*( h( incvec , th , g ) - rval ) / N + ( ahat * arptlin )
 
     }
-
     if( type_thresh == 'relm'){
 
       # thresh for the whole population
@@ -223,7 +230,6 @@ svyfgt.survey.design <-
       } else fgtlin <-ID*( h( incvec , th , g ) - rval + ( ( percent * incvec ) - th ) * ahat ) / N
 
     }
-
     if( type_thresh == 'abs' ){
 
       th <- abs_thresh
@@ -234,10 +240,10 @@ svyfgt.survey.design <-
 
     }
 
+    # estimate variance from linearized variable
     variance <- survey::svyrecvar(fgtlin/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata)
 
-
-
+    # setup result object
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
@@ -255,8 +261,10 @@ svyfgt.survey.design <-
 svyfgt.svyrep.design <-
   function(formula, design, g, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE,...) {
 
+    # checked for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
 
+    # check for threshold type
     if( type_thresh == "abs" & is.null( abs_thresh ) ) stop( "abs_thresh= must be specified when type_thresh='abs'" )
 
     # if the class of the full_design attribute is just a TRUE, then the design is
@@ -269,14 +277,17 @@ svyfgt.svyrep.design <-
     # svyrep design ComputeFGT function
     ComputeFGT <-
       function(y, w, thresh, g){
+        y <- y[w>0]
+        w <- w[w>0]
         N <- sum(w)
         sum( w * h( y , thresh , g ) ) / N
       }
 
-
+    # collect domain data
     df <- model.frame(design)
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
+    # treat missing values
     if(na.rm){
       nas<-is.na(incvar)
       design<-design[!nas,]
@@ -284,11 +295,14 @@ svyfgt.svyrep.design <-
       incvar <- incvar[!nas]
     }
 
+    # collect domain sampling weights
     ws <- weights(design, "sampling")
 
+    # collect data from full sample
     df_full<- model.frame(full_design)
     incvec <- model.frame(formula, full_design$variables, na.action = na.pass)[[1]]
 
+    # treat missing values
     if(na.rm){
       nas<-is.na(incvec)
       full_design<-full_design[!nas,]
@@ -296,6 +310,7 @@ svyfgt.svyrep.design <-
       incvec <- incvec[!nas]
     }
 
+    # collect weights from full sample
     wsf <- weights(full_design,"sampling")
     names(incvec) <- names(wsf) <- row.names(df_full)
     ind<- row.names(df)
@@ -305,22 +320,31 @@ svyfgt.svyrep.design <-
     if(type_thresh=='relm') th <- percent*sum(incvec*wsf)/sum(wsf)
     if(type_thresh=='abs') th <- abs_thresh
 
-
+    # compute point estimate
     rval <- ComputeFGT(incvar, ws, g = g, th)
 
+    # collect full sample analysis weights
     wwf <- weights(full_design, "analysis")
 
+    # calcualge replicates
     qq <-
-      apply(wwf, 2, function(wi){
-        names(wi)<- row.names(df_full)
-        wd<-wi[ind]
-        incd <- incvec[ind]
-        ComputeFGT(incd, wd, g = g, th)}
-      )
-    if (anyNA(qq))variance <- NA else variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
+      apply( wwf, 2, function(wi) {
 
+        names( wi ) <- row.names( df_full )
+
+        if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
+        if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
+        if(type_thresh=='abs')  thr <- abs_thresh
+
+        ComputeFGT( incvec , ifelse( names(wi) %in% ind , wi , 0 ), g = g , thr )
+
+      } )
+
+    # calculate variance
+    if ( anyNA(qq) ) variance <- NA else variance <- survey::svrVar( qq, full_design$scale , full_design$rscales, mse = full_design$mse, coef = rval )
     variance <- as.matrix( variance )
 
+    # setup result object
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
@@ -328,6 +352,7 @@ svyfgt.svyrep.design <-
     attr(rval, "lin") <- NA
     if(thresh) attr(rval, "thresh") <- th
     rval
+
   }
 
 #' @rdname svyfgt
