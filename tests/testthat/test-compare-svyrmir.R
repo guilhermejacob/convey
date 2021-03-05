@@ -94,6 +94,9 @@ test_that("compare results convey vs vardpoor",{
   # compare point estimates on domains
   expect_equal( vardestd , convestd )
 
+  # compare CV estimates within five pp. tolerance
+  expect_equal( varse / vardest , convse / vardest , tolerance = .05 )
+  expect_equal( varsed / vardestd , convsed / vardestd , tolerance = .05 )
 
   # compare SE estimates
   skip( "SE estimates differ")

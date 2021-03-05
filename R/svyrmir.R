@@ -135,59 +135,67 @@ svyrmir.survey.design  <-
     h <- h_fun(incvar,w)
     age.name <- terms.formula(age)[[2]]
 
-    ### > 65 yo median income
+    ### < 65 yo median income
     dsub1 <- eval( substitute( within_function_subset( design , age < agelim ) , list( age = age.name, agelim = agelim ) ) )
     if( nrow( dsub1 ) == 0 ) stop( "zero records in the set of non-elderly people" )
     if( "DBIsvydesign" %in% class( dsub1 ) ) {
-      ind1<- names(design$prob) %in% which(dsub1$prob!=Inf)
+      ind1 <- names(design$prob) %in% which(is.finite(dsub1$prob) )
     } else{
-      ind1<- names(design$prob) %in% names(dsub1$prob)
+      ind1 <- names(design$prob) %in% names(dsub1$prob)
     }
-
-    # linearized
-    q_alpha1 <- survey::svyquantile(x = formula, design = dsub1, quantiles = quantiles,method = "constant", na.rm = na.rm,...)
-    q_alpha1 <- as.vector(q_alpha1)
-    Fprime1 <- densfun(formula = formula, design = dsub1, q_alpha1, h=h, FUN = "F", na.rm=na.rm)
-    N1 <- sum(w*ind1)
-    linquant1 <- -( 1 / ( N1 * Fprime1 ) ) *ind1* ( ( incvar <= q_alpha1 ) - quantiles )
-
+    q_alpha1 <- svyiqalpha( formula , dsub1 , quantiles , ... )
 
     ### >= 65 yo income
     dsub2 <- eval( substitute( within_function_subset( design , age >= agelim ) , list( age = age.name, agelim = agelim ) ) )
     if( nrow( dsub2 ) == 0 ) stop( "zero records in the set of elderly people" )
     if( "DBIsvydesign" %in% class( dsub2 ) ) {
-      ind2<- names(design$prob) %in% which(dsub2$prob!=Inf)
+      ind2 <- names(design$prob) %in% which(is.finite(dsub2$prob) )
     } else{
-      ind2<- names(design$prob) %in% names(dsub2$prob)
+      ind2 <- names(design$prob) %in% names(dsub2$prob)
     }
 
     # compute quantiles
-    q_alpha2 <- survey::svyquantile(x = formula, design = dsub2, quantiles = quantiles, method = "constant", na.rm = na.rm,...)
-    q_alpha2 <- as.vector(q_alpha2)
-    Fprime2 <- densfun(formula = formula, design = dsub2, q_alpha2, h=h, FUN = "F", na.rm=na.rm)
-    N2 <- sum(w*ind2)
-    linquant2 <- -( 1 / ( N2 * Fprime2 ) ) *ind2* ( ( incvar <= q_alpha2 ) - quantiles )
+    q_alpha2 <- svyiqalpha( formula , dsub2 , quantiles , ... )
+
+    # create objects for contrastinf
+    MED1 <- list(value = q_alpha1[[1]] , lin = rep( 0 , length( w ) ) )
+    MED2 <- list(value = q_alpha2[[1]] , lin = rep( 0 , length( w ) ) )
+
+    # add partial linearizations
+    MED1$lin [ ind1 ] <- attr( q_alpha1 , "influence" )
+    MED2$lin [ ind2 ] <- attr( q_alpha2 , "influence" )
+    list_all<- list(MED1=MED1, MED2=MED2)
 
     # linearize ratio of medians
-    MED1 <- list(value = q_alpha1 , lin = linquant1 )
-    MED2 <- list(value = q_alpha2 , lin = linquant2 )
-    list_all<- list(MED1=MED1, MED2=MED2)
     RMED <- contrastinf(quote(MED2/MED1),list_all)
-    lin <- RMED$lin
+    lin <- as.numeric( RMED$lin )
+    names( lin ) <- rownames( design$variables )[ w > 0 ]
+
+    # treat out of sample
+    if ( length( lin ) != length( design$prob ) ) {
+      lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
+      lin[ w <= 0] <- 0
+      names( lin ) <- rownames( design$variables )
+    }
 
     # compute variance
-    variance <- survey::svyrecvar(lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
+    variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+    variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+    # keep necessary influence functions
+    lin <- lin[ 1/design$prob > 0 ]
+    names( lin ) <- rownames( design$variables )[ 1/design$prob > 0 ]
+
     # build result object
-    rval <- as.vector(RMED$value)
+    rval <- as.numeric( RMED$value )
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
-    attr( rval , "var" ) <- variance
-    attr(rval, "lin") <- lin
-    attr( rval , "statistic" ) <- "rmir"
+    attr(rval, "var") <- variance
+    attr(rval,"influence") <- lin
     if (med_old) attr( rval, "med_old") <- q_alpha2
     if (med_young) attr( rval, "med_young") <- q_alpha1
+    attr( rval , "statistic" ) <- "rmir"
     rval
 
   }
@@ -219,38 +227,34 @@ svyrmir.svyrep.design <-
     # computation function
     ComputeRmir <-
       function(x, w, quantiles, age, agelim) {
-
         indb <- age < agelim
         inda <-  age >= agelim
-        quant_below <- computeQuantiles(x[indb], w[indb], p = quantiles)
-        quant_above <- computeQuantiles(x[inda], w[inda], p = quantiles)
+        quant_below <- computeQuantiles(x[indb], w[indb], p = quantiles )
+        quant_above <- computeQuantiles(x[inda], w[inda], p = quantiles )
         c(quant_above, quant_below, quant_above/quant_below)
-
       }
 
     # collect sampling weights
     ws <- weights(design, "sampling")
 
     # compute pont estimates
-    Rmir_val <- ComputeRmir(x = incvar, w = ws, quantiles = quantiles, age= agevar, agelim = agelim )
+    Rmir_val <- ComputeRmir( incvar , ws , quantiles, agevar,  agelim )
 
     # collect analysis weights
     ww <- weights(design, "analysis")
 
     # compute replicates
-    qq <- apply( ww, 2, function(wi) ComputeRmir( incvar , wi , quantiles = quantiles, age= agevar , agelim = agelim )[[3]] )
+    qq <- t( apply( ww, 2, function(wi) ComputeRmir( incvar , wi , quantiles, agevar , agelim ) ) )
 
     # compute variance
-    if ( anyNA( qq ) ) variance <- NA else variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = Rmir_val[[3]] )
-    variance <- as.matrix( variance )
-    colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+    variance <- survey::svrVar( qq[ , 3 ], design$scale, design$rscales, mse = design$mse, coef = Rmir_val[3] )
+    names( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # build result object
-    rval <- Rmir_val[3]
+    rval <- Rmir_val[[3]]
     class(rval) <- c( "cvystat" , "svrepstat" )
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     attr( rval , "var" ) <- variance
-    attr(rval, "lin") <- NA
     attr( rval , "statistic" ) <- "rmir"
     if (med_old) attr( rval, "med_old") <- Rmir_val[1]
     if (med_young) attr( rval, "med_young") <- Rmir_val[2]

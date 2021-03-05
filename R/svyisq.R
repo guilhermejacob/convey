@@ -113,13 +113,16 @@ svyisq.survey.design <-
 	  w <- 1/design$prob
 
 	  # store quantile
-	  if (quantile) q_alpha <- survey::svyquantile(x = formula, design = design, quantiles = alpha, method = "constant", na.rm = na.rm,...)
+	  q_alpha <- survey::svyquantile(x = formula, design = design, quantiles = alpha, method = "constant", na.rm = na.rm,...)
 
 	  # compute value
 	  estimate <- CalcISQ( incvar , w , alpha )
 
 	  # compute influence functions
-	  lin <- CalcISQ_IF( incvar , w, alpha )
+	  h <- h_fun(incvar, w)
+	  Fprime0 <- densfun( formula = formula, design = design, q_alpha[[1]] , FUN = "F",     na.rm = na.rm )
+	  Fprime1 <- densfun( formula = formula, design = design, q_alpha[[1]] , FUN = "big_s", na.rm = na.rm )
+	  lin <- CalcISQ_IF( incvar , w, alpha , Fprime0 , Fprime1 )
 
 	  # treat out of sample
 	  if ( length( lin ) != length( design$prob ) ) {
@@ -255,7 +258,7 @@ CalcISQ <- function( x , pw , alpha ) {
 }
 
 # function for influence functions
-CalcISQ_IF <- function( x , pw , alpha ) {
+CalcISQ_IF <- function( x , pw , alpha , Fprime0 , Fprime1 ) {
 
   # filter observations
   x <- x [ pw > 0 ]
@@ -269,8 +272,8 @@ CalcISQ_IF <- function( x , pw , alpha ) {
 
   # linearization
   h <- h_fun(x, pw)
-  Fprime0 <- CalcDensFun( x , pw , q_alpha , h=h , FUN = "F" )
-  Fprime1 <- CalcDensFun( x , pw , q_alpha , FUN = "big_s" )
+  # Fprime0 <- CalcDensFun( x , pw , q_alpha , h=h , FUN = "F" )
+  # Fprime1 <- CalcDensFun( x , pw , q_alpha , FUN = "big_s" )
   iq <- -( 1 / ( N * Fprime0 ) ) * ( ( x <= q_alpha ) - alpha )
   isqalpha1 <- x * (x <= q_alpha)
   isqalpha <- isqalpha1 + Fprime1 * iq

@@ -127,7 +127,7 @@ svyqsr.survey.design <-
     qS20 <- attr(S20, "quantile")
     totS20 <- coef(S20)
     attributes(totS20) <- NULL
-    S20 <- list(value= coef(S20), lin=attr(S20,"influence"))
+    S20 <- list(value= totS20[[1]], lin=attr(S20,"influence"))
 
     # test division by zero
     if( S20$value == 0 ) stop( paste0( "division by zero. the alpha1=" , alpha1 , " percentile cannot be zero or svyqsr would return Inf" ) )
@@ -137,10 +137,13 @@ svyqsr.survey.design <-
     qS80 <- attr(S80, "quantile")
     totS80 <- coef(S80)
     attributes(totS80) <- NULL
-    S80 <- list(value= coef(S80), lin=attr(S80,"influence"))
+    S80 <- list(value=totS80[[1]], lin=attr(S80,"influence"))
 
     # build total
     TOT <- list(value=sum(incvar*w), lin=incvar)
+
+    # ensure consistent lengths
+    stopifnot( length( unique( sapply( lapply( list( S80 , S20 , TOT ) , `[[` , "lin" ) , length ) ) ) <= 1 )
 
     # LINEARIZED VARIABLE OF THE SHARE RATIO
     list_all <- list(TOT=TOT, S20 = S20, S80 = S80)
@@ -161,6 +164,7 @@ svyqsr.survey.design <-
 
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
+    names( lin ) <- rownames( design$variables )[ w > 0 ]
 
     # build result object
     rval <- as.numeric( QSR$value )

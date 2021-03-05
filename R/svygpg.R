@@ -133,14 +133,17 @@ svygpg.survey.design <-
 		rval <- IGPG$value
 
 		# calculate variance
-		infun <- IGPG$lin
+		infun <- as.numeric( IGPG$lin )
 		variance <- survey::svyrecvar(infun/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
+
+		# add indices to influence function
+		names( infun ) <- rownames( design$variables )[ !is.infinite( design$prob ) ]
 
 		# build result object
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class(rval) <- c( "cvystat" , "svystat" )
 		attr( rval , "var" ) <- variance
-		attr(rval, "lin") <- infun
+		attr(rval, "influence" ) <- infun
 		attr( rval , "statistic" ) <- "gpg"
 		rval
 

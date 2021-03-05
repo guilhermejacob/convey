@@ -130,12 +130,12 @@ svyrmpg.survey.design <-
 		# compute threshold
 		ARPT <- svyarpt(formula = formula, full_design, quantiles = quantiles, percent = percent, na.rm = na.rm )
 		arpt <- coef(ARPT)
-		linarpt <- attr(ARPT, "lin")
+		linarpt <- attr(ARPT, "influence")
 
 		# compute poormed
 		POORMED <- svypoormed(formula = formula, design = design, quantiles = quantiles, percent = percent, na.rm = na.rm)
 		medp <- coef(POORMED)
-		linmedp <- attr(POORMED, "lin")
+		linmedp <- attr(POORMED, "influence")
 		MEDP <- list(value = medp, lin = linmedp)
 		ARPT <- list(value = arpt, lin = linarpt)
 		list_all<- list(ARPT=ARPT, MEDP=MEDP)
@@ -154,7 +154,7 @@ svyrmpg.survey.design <-
 		names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class(rval) <- c( "cvystat" , "svystat" )
 		attr( rval , "var" ) <- variance
-		attr(rval, "lin") <- infun
+		attr(rval, "influence") <- infun
 		attr( rval , "statistic" ) <- "rmpg"
 		if(thresh) attr(rval, "thresh") <- arpt
 		if(poor_median) attr(rval, "poor_median") <- medp
@@ -239,7 +239,7 @@ svyrmpg.svyrep.design <-
 		# build result object
 		class(rval) <- c( "cvystat" , "svrepstat" )
 		attr( rval , "var" ) <- variance
-		attr( rval, "lin") <- NA
+		attr( rval, "influence") <- NA
 		attr( rval , "statistic" ) <- "rmpg"
 		if ( thresh ) attr(rval, "thresh") <- Rmpg_val[1]
 		if ( poor_median ) attr(rval, "poor_median") <- Rmpg_val[2]

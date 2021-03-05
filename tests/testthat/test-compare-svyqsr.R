@@ -76,7 +76,7 @@ attributes( varsed ) <- NULL
 ### using convey
 
 # calculate estimates
-fun_qsrd <- svyby( ~eqincome , ~hsize , des_eusilc , svyqsr , quantiles = 0.5 , percent = 0.6 , deff = FALSE )
+fun_qsrd <- svyby( ~eqincome , ~hsize , des_eusilc , svyqsr )
 
 # collect point estimates
 convestd <- coef( fun_qsrd )
