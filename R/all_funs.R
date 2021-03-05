@@ -127,7 +127,7 @@ icdf <- function(formula, design, x, na.rm = FALSE, ...) {
   variance <- survey::svyrecvar(lin/design$prob, design$cluster,
                                 design$strata, design$fpc, postStrata = design$postStrata)
   class(rval) <- c( "cvystat" , "svystat" )
-  attr(rval, "lin") <- lin
+  attr(rval, "influence") <- lin
   attr(rval, "var") <- variance
   attr(rval, "statistic") <- "cdf"
   rval
@@ -204,7 +204,7 @@ coef.cvystat <- function(object, ...) {
   attr(object, "statistic") <- NULL
   attr(object, "deff") <- NULL
   attr(object, "var") <- NULL
-  attr(object, "lin") <- NULL
+  attr(object, "influence") <- NULL
   attr(object, "quantile") <- NULL
   attr(object, "epsilon") <- NULL
   attr(object, "dimensions") <- NULL
