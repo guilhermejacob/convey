@@ -14,11 +14,12 @@ context("isq output survey.design and svyrep.design")
 data("api")
 
 # set up convey design
-dstrat1<-convey_prep(svydesign(id=~1,data=apistrat))
+expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
 
 # perform tests
 test_that("svyisq works on unweighted designs", {
-  svyisq( ~api00, design=dstrat1 , alpha  =.2 )
+  expect_false( is.na ( coef( svyisq( ~api00, design=dstrat1 , alpha = .2 ) ) ) )
+  expect_false( is.na ( SE( svyisq( ~api00, design=dstrat1 , alpha = .2 ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- data.frame-backed design object
@@ -35,15 +36,11 @@ des_eusilc_rep <-as.svrepdesign( des_eusilc , type= "bootstrap" , replicates = 5
 des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
-# filter observations
-des_eusilc <- subset( des_eusilc , hsize < 8 )
-des_eusilc_rep <- subset( des_eusilc_rep , hsize < 8 )
-
 # calculate estimates
 a1 <- svyisq( ~eqincome , des_eusilc , alpha = .2 )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc , FUN = svyisq , alpha = .2 )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyisq , alpha = .2 )
 b1 <- svyisq( ~eqincome , des_eusilc_rep , alpha = .2 )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyisq , alpha = .2 )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyisq , alpha = .2 )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -57,8 +54,8 @@ test_that( "output svyisq" , {
   expect_is( coef( b2 ) ,"numeric" )
   expect_equal( coef( a1 ) , coef( b1 ) )
   expect_equal( coef( a2 ) , coef( b2 ) )
-  expect_lte( cv_diff1 , coef(a1) * 0.05 )        # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
-  expect_lte( se_diff2 , max( coef(a2) ) * 0.05 ) # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
+  expect_lte( cv_diff1 , coef(a1) * .20 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
+  expect_lte( se_diff2 , max( coef(a2) ) * .20 )  # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
   expect_is( SE( a1 ) , "matrix" )
   expect_is( SE( a2 ) , "numeric" )
   expect_is( SE( b1 ) , "numeric" )
@@ -104,12 +101,9 @@ test_that("database svyisq",{
   # prepare for convey
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
-  # filter observations
-  dbd_eusilc <- subset( dbd_eusilc , hsize < 8 )
-
   # calculate estimates
-  c1 <- svyisq( ~eqincome , dbd_eusilc , alpha = .2 )
-  c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyisq , alpha = .2 )
+  c1 <- svyisq( ~ eqincome , dbd_eusilc , alpha = .2 )
+  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svyisq , alpha = .2 )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -121,7 +115,7 @@ test_that("database svyisq",{
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 ) )
 
-  # ensure positioning of the influence function
+  # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
 
 } )
@@ -196,22 +190,17 @@ test_that("dbi subsets equal non-dbi subsets",{
       data = "eusilc" ,
       dbtype="SQLite" ,
       dbname = dbfile ,
-      combined.weights = FALSE
-    )
+      combined.weights = FALSE )
 
   # prepare for convey
   dbd_eusilc <- convey_prep( dbd_eusilc )
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
-  # filter observations
-  dbd_eusilc <- subset( dbd_eusilc , hsize < 8 )
-  dbd_eusilc_rep <- subset( dbd_eusilc_rep , hsize < 8 )
-
   # calculate estimates
-  sub_dbd <- svyisq( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , alpha = .2 )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyisq , alpha = .2 )
-  sub_dbr <- svyisq( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , alpha = .2 )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyisq , alpha = .2 )
+  sub_dbd <- svyisq( ~eqincome , design = subset( des_eusilc , hsize == 1) , alpha = .2 )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyisq , alpha = .2 )
+  sub_dbr <- svyisq( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , alpha = .2 )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyisq , alpha = .2 )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -230,7 +219,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
 
-  # ensure positioning of the influence function
+  # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
 } )
+
