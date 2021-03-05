@@ -83,7 +83,7 @@ convestd <- coef( fun_ginid )
 attributes( convestd ) <- NULL
 
 # collect SE estimates
-convsed<- SE( fun_ginid )
+convsed <- SE( fun_ginid )
 
 # perform tests
 test_that("compare results convey vs vardpoor",{
