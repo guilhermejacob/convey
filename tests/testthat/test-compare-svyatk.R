@@ -1,30 +1,61 @@
-context("Atk output")
-library(survey)
-library(IC2)
-library(laeken)
-data(eusilc)
-dati = data.frame(IDd = seq( 10000 , 10000 + nrow( eusilc ) - 1 ) , eusilc)
-dati_nz <- subset(dati, eqIncome > 0)
+# compares with vardpoor output
 
-des_eusilc <- svydesign(ids = ~rb030, strata =~db040,  weights = ~rb050, data = eusilc)
+# load libraries
+library( laeken )
+library( survey )
+library( convey )
+library( IC2 )
+library( testthat )
 
-des_eusilc <- convey_prep(des_eusilc)
-convey_atk <- svyatk(~eqIncome, subset(des_eusilc, eqIncome > 0) )
+# test context
+context("atk comparison with IC2")
 
-IC2_atk <- calcAtkinson( x = dati_nz$eqIncome, w = dati_nz$rb050 )$ineq$index
+# collect and format data
+data( eusilc )
+names( eusilc ) <- tolower( names( eusilc ) )
 
-# point estiamte
-vardest <- as.numeric( IC2_atk )
-convest <- as.numeric(coef(convey_atk)[1])
-#domain
-# IC2 point estimates
-vardestd <- sapply( split(dati_nz, dati_nz$hsize), function(x){ calcAtkinson( x = x$eqIncome, w = x$rb050 )$ineq$index[[1]] } )
-vardestd <- as.numeric( vardestd )
+### convey calculations
 
-# convey point estimates
-convestd <- as.numeric( coef( svyby(~eqIncome, ~factor(hsize), subset(des_eusilc, eqIncome > 0), svyatk) ) )
+# build survey design objects
+des_eusilc <- svydesign( ids = ~rb030 , strata =~db040 , weights = ~rb050 , data = eusilc )
+des_eusilc_rep <- as.svrepdesign( des_eusilc , type= "bootstrap" )
 
+# prepare survey design objects for convey
+des_eusilc <- convey_prep( des_eusilc )
+des_eusilc_rep <- convey_prep( des_eusilc_rep )
+
+# filter positive incomes
+des_eusilc <- subset( des_eusilc , eqincome > 0 )
+des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
+
+# calculate estimates using convey
+fun_atkw <- svyatk( ~eqincome , des_eusilc )
+fun_atkw_rep <- svyatk( ~eqincome , des_eusilc_rep )
+
+# collect point estimates from convey object
+convest <- coef( fun_atkw )
+attributes( convest ) <- NULL
+
+# collect SE estimates from convey object
+convse <- SE( fun_atkw )
+attributes( convse ) <- NULL
+
+### IC2 calculations
+
+# compute point estimates
+IC2est  <- calcAtkinson( x = eusilc$eqincome[ eusilc$eqincome > 0 ], w = eusilc$rb050[ eusilc$eqincome > 0 ] )$ineq$index[[1]]
+
+# perform tests
 test_that("compare results convey vs vardpoor",{
-  expect_equal(vardest,convest)
-  expect_equal(vardestd, convestd)
-})
+
+  # compare point estimates
+  expect_equal( IC2est[[1]] , convest )
+
+  # # compare point estimates on domains
+  # expect_equal( vardestd , convestd*100 )
+  #
+  # # compare SE estimates
+  # expect_equal( varse , convse*100 )
+  # expect_equal( varsed , convsed*100 )
+
+} )
