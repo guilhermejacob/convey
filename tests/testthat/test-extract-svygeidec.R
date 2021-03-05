@@ -31,6 +31,8 @@ a1 <- svygeidec( ~eqincome , des_eusilc , epsilon = .5 , subgroup = ~db040 )
 a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svygeidec , epsilon = .5 , subgroup = ~db040 )
 b1 <- svygeidec( ~eqincome , des_eusilc_rep , epsilon = .5 , subgroup = ~db040 )
 b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svygeidec , epsilon = .5 , subgroup = ~db040 )
+d1 <- svygei( ~eqincome , des_eusilc , epsilon = .5 )
+d2 <- svyby( ~eqincome , ~rb090, des_eusilc , svygei , epsilon = .5 )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ))
@@ -50,6 +52,13 @@ test_that( "output svygei" , {
   expect_equal( sum( confint( a2 )[,2] >= coef( a2 ) ) , length( coef( a2 ) ) )
   expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
+  expect_equal( coef( a1 )[[1]] , coef( d1 )[[1]] )
+  expect_equal( as.numeric( coef( a2 )[1:2] ) , as.numeric( coef( d2 ) ) )
+
+  # compare with svygei
+  expect_equal( SE( a1 )[[1]] , SE( d1 )[[1]] )
+  expect_equal( as.numeric( SE( a2 )[,1] ) , as.numeric( SE( d2 ) ) )
+
 } )
 
 ### test 2: income data from eusilc --- database-backed design object

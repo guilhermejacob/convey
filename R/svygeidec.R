@@ -157,13 +157,15 @@ svygeidec.survey.design <-
     grpvar <- interaction( grpvar )
 
     # total
-    ttl.gei <- ComputeGEI( x = incvar, weights = w, epsilon = epsilon )
+    ttl.gei <- CalcGEI( x = incvar, weights = w, epsilon = epsilon )
 
     # compute influence function
-    ttl.lin <- ComputeGEI_IF( x = incvar, weights = w, epsilon = epsilon )
+    ttl.lin <- CalcGEI_IF( x = incvar, weights = w, epsilon = epsilon )
 
     # treat domain
-    ttl.lin [ w <= 0 ] <- 0
+    ttl.lin <- ttl.lin[ pmatch( names( w ) , names( ttl.lin ) ) ]
+    names( ttl.lin ) <- names( w )
+    ttl.lin[ w<=0 ] <- 0
 
     # create matrix of group-specific weights
     wg <- sapply( levels(grpvar) , function(z) ifelse( grpvar == z , w , 0 ) )
@@ -171,28 +173,15 @@ svygeidec.survey.design <-
     # calculate group-specific GEI and influence functions
     grp.gei <- lapply( colnames( wg )  , function( this.group ) {
       wi <- wg[ , this.group ]
-      list( value = ComputeGEI( x = incvar, weights = wi , epsilon = epsilon ) ,
-            lin = ComputeGEI_IF( x = incvar, weights = wi , epsilon = epsilon ) )
+      statobj <- list(
+        value = CalcGEI( x = incvar, weights = wi , epsilon = epsilon ) ,
+        lin = CalcGEI_IF( x = incvar, weights = wi , epsilon = epsilon ) )
+      lin2 <- rep( 0 , length( wi ) )
+      lin2[ wi > 0 ] <- statobj$lin
+      statobj$lin <- lin2
+      statobj
     } )
     names( grp.gei ) <- colnames( wg )
-
-    # # calculate group population shares and influences functions
-    # grp.p.share <- lapply( colnames( wg )  , function( this.group ) {
-    #   wi <- wg[ , this.group ]
-    #   constrastinf( quote( N.g / N ) ,
-    #                 list( N.g = list( value = sum( wi ) , lin = 1*(wi>0) ) ,
-    #                       N= list( value = sum( w ) , lin = 1*(w > 0) ) ) )
-    # } )
-    # names( grp.p.share ) <- colnames( wg )
-    #
-    # # calculate group income shares and influences functions
-    # grp.s.share <- lapply( colnames( wg )  , function( this.group ) {
-    #   wi <- wg[ , this.group ]
-    #   constrastinf( quote( Y.g / Y ) ,
-    #                 list( Y.g = list( value = sum( incvar * wi ) , lin = incvar*(wi > 0) ) ,
-    #                       Y = list( value = sum( incvar * w ) , lin = incvar*(w > 0) ) ) )
-    # } )
-    # names( grp.s.share ) <- colnames( wg )
 
     # calculate within component weight
     grp.gei.wgt <- lapply( colnames( wg ) , function(i) {
@@ -233,18 +222,21 @@ svygeidec.survey.design <-
     btw.gei <- ttl.gei - wtn.gei
     between.lin <- ttl.lin - within.lin
 
-    # create matrix of estimates
-    estimates <-c( ttl.gei, wtn.gei, btw.gei )
+    # create vector of estimates
+    estimates <- c( ttl.gei, wtn.gei, btw.gei )
     names( estimates ) <- c( "total", "within", "between" )
 
-    # compute variance
+    # treat out of sample
     lin.matrix <- matrix( data = c(ttl.lin, within.lin, between.lin), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
-    if ( anyNA( lin.matrix[ w >0 , ] ) ) {
-      variance <- diag( estimates )
-      variance[,] <- NA
-    } else {
-      variance <- survey::svyrecvar( lin.matrix/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+    if ( nrow( lin.matrix ) != length( design$prob ) ) {
+      rownames( lin.matrix ) <- rownames( design$variables )[ w > 0 ]
+      lin.matrix <- lin.matrix[ pmatch( rownames( design$variables ) , rownames(lin.matrix ) ) , ]
+      lin.matrix[ w <= 0 , ] <- 0
     }
+
+    # compute variance
+    variance <- survey::svyrecvar( sweep( lin.matrix , 1 , 1/design$prob , "*" ) , design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+    variance[ which( is.nan( variance ) ) ] <- NA
 
     # build result object
     rval <- c( estimates )
@@ -301,7 +293,7 @@ svygeidec.svyrep.design <-
       Y.g <- tapply( w * y , grp , sum , na.rm = TRUE )
       s.g <- Y.g / Y
       p.g <- N.g / N
-      gei.g <- sapply( levels( grp ) , function( grpv ) ComputeGEI( y , ifelse( grp == grpv , w , 0 ) , epsilon = epsilon ) )
+      gei.g <- sapply( levels( grp ) , function( grpv ) CalcGEI( y , ifelse( grp == grpv , w , 0 ) , epsilon = epsilon ) )
 
       if ( epsilon == 0 ) {
         estimate <- sum( p.g * gei.g )
@@ -344,12 +336,12 @@ svygeidec.svyrep.design <-
 
     # collect analysis weights
     ww <- weights(design, "analysis")
-    qq.ttl.gei <- apply(ww, 2, function(wi) ComputeGEI(incvar, wi, epsilon = epsilon) )
+    qq.ttl.gei <- apply(ww, 2, function(wi) CalcGEI(incvar, wi, epsilon = epsilon) )
 
     ### point estimates
 
     # total inequality
-    ttl.gei <- ComputeGEI( x = incvar, weights = ws , epsilon = epsilon )
+    ttl.gei <- CalcGEI( x = incvar, weights = ws , epsilon = epsilon )
     btw.gei <- fun.btw.gei( incvar , ws , grpvar , epsilon )
     # wtn.gei <- fun.wtn.gei( incvar , ws , grpvar , epsilon )
     wtn.gei <- ttl.gei - btw.gei
@@ -360,7 +352,7 @@ svygeidec.svyrep.design <-
 
     # create matrix of replicates
     qq <- apply( ww , 2 , function( wi ) {
-      ttl.rep <- ComputeGEI( incvar, wi , epsilon )
+      ttl.rep <- CalcGEI( incvar, wi , epsilon )
       btw.rep <- fun.btw.gei( incvar , wi , grpvar , epsilon )
       wtn.rep <- ttl.rep - btw.rep
       c( ttl.rep , wtn.rep , btw.rep )
