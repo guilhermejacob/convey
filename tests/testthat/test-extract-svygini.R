@@ -14,11 +14,12 @@ context("gini output survey.design and svyrep.design")
 data("api")
 
 # set up convey design
-dstrat1<-convey_prep(svydesign(id=~1,data=apistrat))
+expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
 
 # perform tests
 test_that("svygini works on unweighted designs", {
-  svygini( ~api00, design=dstrat1 )
+  expect_false( is.na ( coef( svygini( ~api00, design=dstrat1 ) ) ) )
+  expect_false( is.na ( SE( svygini( ~api00, design=dstrat1 ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- data.frame-backed design object
@@ -37,7 +38,7 @@ des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
 a1 <- svygini( ~eqincome , des_eusilc )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygini , epsilon =.5 )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygini )
 b1 <- svygini( ~eqincome , des_eusilc_rep )
 b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygini )
 
@@ -53,8 +54,8 @@ test_that( "output svygini" , {
   expect_is( coef( b2 ) ,"numeric" )
   expect_equal( coef( a1 ) , coef( b1 ) )
   expect_equal( coef( a2 ) , coef( b2 ) )
-  # expect_lte( cv_diff1 , coef(a1) * 0.05 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
-  # expect_lte( se_diff2 , max( coef(a2) ) * 0.05 ) # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
+  expect_lte( cv_diff1 , coef(a1) * .20 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
+  expect_lte( se_diff2 , max( coef(a2) ) * .20 )  # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
   expect_is( SE( a1 ) , "matrix" )
   expect_is( SE( a2 ) , "numeric" )
   expect_is( SE( b1 ) , "numeric" )

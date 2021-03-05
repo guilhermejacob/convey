@@ -14,7 +14,7 @@ context("atk output survey.design and svyrep.design")
 data("api")
 
 # set up convey design
-dstrat1<-convey_prep(svydesign(id=~1,data=apistrat))
+expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
 
 # perform tests
 test_that("svyatk works on unweighted designs", {

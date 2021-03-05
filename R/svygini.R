@@ -117,7 +117,7 @@ svygini.survey.design <-
     # treat out of sample
     if ( length( lin ) != length( design$prob ) ) {
       names( lin ) <- rownames( design$variables )[ w > 0 ]
-      lin <- lin[pmatch( rownames( design$variables ) , names(lin) ) ]
+      lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
       lin[ w <= 0] <- 0
     }
 
@@ -237,7 +237,7 @@ CalcGini_IF <- function( x , pw ) {
 
   # filter observations
   x <- x[ pw > 0 ]
-  x <- x[ pw > 0 ]
+  pw <- pw[ pw > 0 ]
 
   # collect indices
   ind <- names( pw )

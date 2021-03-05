@@ -14,11 +14,12 @@ context("gei output survey.design and svyrep.design")
 data("api")
 
 # set up convey design
-dstrat1<-convey_prep(svydesign(id=~1,data=apistrat))
+expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
 
 # perform tests
 test_that("svygei works on unweighted designs", {
-  svygei( ~api00, design=dstrat1 )
+  expect_false( is.na ( coef( svygei( ~api00, design=dstrat1 ) ) ) )
+  expect_false( is.na ( SE( svygei( ~api00, design=dstrat1 ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- data.frame-backed design object
@@ -34,6 +35,9 @@ des_eusilc_rep <-as.svrepdesign( des_eusilc , type= "bootstrap" , replicates = 5
 # prepare for convey
 des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
+
+# only striclty positive incomes
+test_that( "error on income <= 0 " , expect_error( svygei( ~eqincome , des_eusilc , epsilon = .5 )  ) )
 
 # filter positive
 des_eusilc <- subset( des_eusilc , eqincome > 0 )
@@ -57,8 +61,8 @@ test_that( "output svygei" , {
   expect_is( coef( b2 ) ,"numeric" )
   expect_equal( coef( a1 ) , coef( b1 ) )
   expect_equal( coef( a2 ) , coef( b2 ) )
-  expect_lte( cv_diff1 , coef(a1) * 0.05 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
-  expect_lte( se_diff2 , max( coef(a2) ) * 0.05 ) # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
+  expect_lte( cv_diff1 , coef(a1) * .20 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
+  expect_lte( se_diff2 , max( coef(a2) ) * .20 )  # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
   expect_is( SE( a1 ) , "matrix" )
   expect_is( SE( a2 ) , "numeric" )
   expect_is( SE( b1 ) , "numeric" )
@@ -104,7 +108,7 @@ test_that("database svygei",{
   # prepare for convey
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
-  # filter ositive
+  # filter positive
   dbd_eusilc <- subset( dbd_eusilc , eqincome > 0 )
 
   # calculate estimates
@@ -120,6 +124,9 @@ test_that("database svygei",{
   expect_equal( coef( a2 ) , coef( c2 ) )
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 ) )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
 
 } )
 
@@ -225,5 +232,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
   expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
 } )

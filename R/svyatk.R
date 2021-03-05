@@ -154,18 +154,6 @@ svyatk.survey.design <-
     # collect weights
     w <- 1/design$prob
 
-    # # treat missing
-    # if ( any( is.na( incvar [w != 0] ) ) ) {
-    # 	rval <- NA
-    # 	variance <- as.matrix(NA)
-    # 	colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    # 	class(rval) <- c( "cvystat" , "svystat" )
-    # 	attr(rval, "var") <- variance
-    # 	attr(rval, "statistic") <- "atkinson"
-    # 	attr(rval,"epsilon")<- epsilon
-    # 	return(rval)
-    # }
-
     # check for strictly positive incomes
     if ( any(incvar[w != 0] <= 0, na.rm = TRUE) ) stop( "The Atkinson indices are defined for strictly positive variables only.\nNegative and zero values not allowed." )
 
@@ -178,7 +166,7 @@ svyatk.survey.design <-
     # treat out of sample
     if ( length( lin ) != length( design$prob ) ) {
       names( lin ) <- rownames( design$variables )[ w > 0 ]
-      lin <- lin[pmatch( rownames( design$variables ) , names(lin) ) ]
+      lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
       lin[ w <= 0] <- 0
     }
 
