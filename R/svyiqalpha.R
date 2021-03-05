@@ -94,47 +94,51 @@ svyiqalpha <-
 svyiqalpha.survey.design <-
   function(formula, design, alpha, na.rm=FALSE, ...) {
 
-    # check for convey_prep
-    if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
-
     # collect data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
     # treat missing values
-    if(na.rm){
-      nas<-is.na(incvar)
-      design<-design[!nas,]
-      if (length(nas) > length(design$prob)) incvar <- incvar[!nas] else incvar[nas] <- 0
+    if (na.rm) {
+      nas <- is.na(incvar)
+      design <- design[!nas, ]
+      if (length(nas) > length(design$prob))
+        incvar <- incvar[!nas]
+      else incvar[nas] <- 0
     }
-
-    # add domain indices
-    ind <- names(design$prob)
 
     # collect weights
     w <- 1/design$prob
 
-    # population size
-    N <- sum(w)
+    # compute value
+    estimate <- computeQuantiles( incvar , w , alpha )
 
-    # calculate quantiles
-    q_alpha <- survey::svyquantile(x = formula, design = design, quantiles = alpha, method = "constant", na.rm = na.rm,...)
-    q_alpha <- as.vector(q_alpha)
-    rval <- q_alpha
+    # compute influence functions
+    # h <- h_fun(incvar, w)
+    # Fprime <- densfun( formula = formula, design = design , estimate , h=h, FUN = "F", na.rm=na.rm )
+    lin <- CalcQuantile_IF( incvar , w , alpha )
 
-    # linearized variable
-    h <- h_fun(incvar, w)
-    Fprime <- densfun(formula = formula, design = design, q_alpha, h=h, FUN = "F", na.rm=na.rm)
-    iq <- -(1/(N * Fprime)) * ((incvar <= q_alpha) - alpha)
+    # treat out of sample
+    if ( length( lin ) != length( design$prob ) ) {
+      names( lin ) <- rownames( design$variables )[ w > 0 ]
+      lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
+      lin[ w <= 0] <- 0
+    }
 
     # compute variance
-    variance <- survey::svyrecvar(iq/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata)
-    colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+    variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+    variance[ which( is.nan( variance ) ) ] <- NA
+    colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
-    # build result objects
+    # keep necessary influence functions
+    lin <- lin[ 1/design$prob > 0 ]
+
+    # build result object
+    rval <- estimate
+    names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
-    attr(rval, "lin") <- iq
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "quantile"
+    attr(rval,"influence") <- lin
     rval
 
   }
@@ -148,32 +152,41 @@ svyiqalpha.svyrep.design <-
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
 
-    # collect income data
+    # collect income variable
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
 
-    # test for missing values
+    # treat missings
     if(na.rm){
       nas<-is.na(incvar)
       design<-design[!nas,]
-      if (length(nas) > length(design$prob)) incvar <- incvar[!nas] else incvar[nas] <- 0
+      df <- model.frame(design)
+      incvar <- incvar[!nas]
     }
 
     # collect sampling weights
-    w <- weights(design, "sampling")
-    quant_val <- computeQuantiles(incvar, w, p = alpha)
-    quant_val <- as.vector(quant_val)
-    rval <- quant_val
+    ws <- weights(design, "sampling")
+
+    # compute point estimate
+    estimate <- computeQuantiles( incvar , ws , alpha )
 
     # collect analysis weights
     ww <- weights(design, "analysis")
-    qq <- apply(ww, 2, function(wi)  computeQuantiles(incvar, wi, p = alpha))
+
+    # compute replicates
+    qq <- apply( ww, 2 , function(wi) computeQuantiles( incvar , wi , alpha ) )
 
     # compute variance
-    if( anyNA( qq ) ) variance <- NA else variance <- survey::svrVar( qq , design$scale , design$rscales , mse = design$mse , coef = rval )
-    variance <- as.matrix( variance )
-    colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+    if ( any( is.na( qq ) ) ) variance <- as.matrix( NA ) else {
+      variance <- survey::svrVar( qq , design$scale , design$rscales , mse = design$mse , coef = estimate )
+      this.mean <- attr( variance , "means" )
+      variance <- as.matrix( variance )
+      attr( variance , "means" ) <- this.mean
+    }
+    colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # build result object
+    rval <- estimate
+    names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "quantile"
@@ -217,3 +230,58 @@ svyiqalpha.DBIsvydesign <-
 
     NextMethod("svyiqalpha", design)
   }
+
+
+# function for influence functions
+CalcQuantile_IF <- function(xx, w, p) {
+
+  # filter observations
+  xx <- xx[ w > 0 ]
+  w <- w[w>0 ]
+
+  # population size
+  N <- sum(w)
+
+  # calculate quantiles
+  q_alpha <- computeQuantiles( xx , w , p )
+  q_alpha <- as.numeric( q_alpha )
+
+  # compute h
+  h <- h_fun(xx, w)
+
+  # compute Fprime
+  Fprime <- compute_densfun( xx , w , q_alpha , h , "F" )
+
+  # linearized variable
+  iq <- -(1/(N * Fprime)) * ((xx <= q_alpha) - p )
+
+  # add indices
+  names(iq) <- names( w )
+
+  # return object
+  iq
+
+}
+
+# auxilliary function
+compute_densfun <- function(incvar, w, x, h = NULL, FUN = "F" ) {
+
+  if( !( FUN %in% c( "F" , "big_s" ) ) ) stop( "valid choices for `FUN=` are 'F' and 'big_s'" )
+
+  # filter observations
+  incvar <- incvar[w>0]
+  w <- w[w>0]
+
+  # run calculations
+  N <- sum(w)
+  if(is.null(h)) h <- h_fun(incvar,w)
+  u <- (x - incvar)/h
+  vectf <- exp(-(u^2)/2)/sqrt(2 * pi)
+  if (FUN == "F")
+    res <- sum(vectf * w)/(N * h) else {
+      v <- w * incvar
+      res <- sum(vectf * v)/h
+    }
+  res
+
+}

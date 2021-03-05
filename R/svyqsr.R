@@ -123,37 +123,44 @@ svyqsr.survey.design <-
     ind <- names(design$prob)
 
     # Linearization of S20
-    S20 <- svyisq(formula = formula, design = design, alpha1, na.rm=na.rm)
+    S20 <- svyisq(formula = formula, design = design, alpha1, na.rm=na.rm, quantile = TRUE )
     qS20 <- attr(S20, "quantile")
     totS20 <- coef(S20)
     attributes(totS20) <- NULL
-    S20 <- list(value= coef(S20), lin=attr(S20,"lin"))
+    S20 <- list(value= coef(S20), lin=attr(S20,"influence"))
 
     # test division by zero
     if( S20$value == 0 ) stop( paste0( "division by zero. the alpha1=" , alpha1 , " percentile cannot be zero or svyqsr would return Inf" ) )
 
     # Linearization of S80
-    S80 <- svyisq(formula = formula, design = design, alpha2 , na.rm=na.rm)
+    S80 <- svyisq(formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE )
     qS80 <- attr(S80, "quantile")
     totS80 <- coef(S80)
     attributes(totS80) <- NULL
-    S80 <- list(value= coef(S80), lin=attr(S80,"lin"))
-
-    # add domain indices
-    names(incvar)<-ind
+    S80 <- list(value= coef(S80), lin=attr(S80,"influence"))
 
     # build total
     TOT <- list(value=sum(incvar*w), lin=incvar)
 
     # LINEARIZED VARIABLE OF THE SHARE RATIO
-
     list_all <- list(TOT=TOT, S20 = S20, S80 = S80)
     QSR <- contrastinf( quote((TOT-S80)/S20), list_all)
     lin <- as.vector(QSR$lin)
 
-    # compute vairance
-    variance <- survey::svyrecvar(lin/design$prob, design$cluster,design$strata, design$fpc, postStrata = design$postStrata)
+    # treat out of sample
+    if ( length( lin ) != length( design$prob ) ) {
+      names( lin ) <- rownames( design$variables )[ w > 0 ]
+      lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
+      lin[ w <= 0] <- 0
+    }
+
+    # compute variance
+    variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+    variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+    # keep necessary influence functions
+    lin <- lin[ 1/design$prob > 0 ]
 
     # build result object
     rval <- as.numeric( QSR$value )
@@ -162,9 +169,9 @@ svyqsr.survey.design <-
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "qsr"
-    attr(rval, "lin") <- lin
-    if(upper_quant)  attr(rval, "upper_quant") <- qS80
-    if(lower_quant)  attr(rval, "lower_quant") <- qS20
+    attr(rval, "influence") <- lin
+    if(upper_quant)  attr(rval, "upper_quant") <- attr( S80 , "quantile")
+    if(lower_quant)  attr(rval, "lower_quant") <- attr( S20 , "quantile")
     if(upper_tot)  attr(rval, "upper_tot") <- TOT$value-totS80
     if(lower_tot)  attr(rval, "lower_tot") <- totS20
     rval
@@ -233,7 +240,7 @@ svyqsr.svyrep.design <-
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "qsr"
-    attr(rval, "lin") <- NA
+    attr(rval, "influence") <- NA
     class(rval) <- c( "cvystat" , "svrepstat" )
     if(upper_quant)  attr(rval, "upper_quant") <- Qsr_val[1]
     if(lower_quant)  attr(rval, "lower_quant") <- Qsr_val[2]
