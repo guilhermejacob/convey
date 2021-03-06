@@ -37,9 +37,9 @@ des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
 a1 <- svyarpt( ~eqincome , des_eusilc , 0.5 , 0.6 )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyarpt , quantiles = 0.5, percent = 0.6 , deff = FALSE )
+a2 <- svyby( ~eqincome , ~hsize, subset( des_eusilc , hsize < 7 ) , svyarpt , quantiles = 0.5, percent = 0.6 , deff = FALSE )
 b1 <- svyarpt( ~eqincome , des_eusilc_rep , 0.5 , 0.6 )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyarpt , quantiles = 0.5 , percent = 0.6 , deff = FALSE )
+b2 <- svyby( ~eqincome , ~hsize, subset( des_eusilc_rep , hsize < 7 ) , svyarpt , quantiles = 0.5 , percent = 0.6 , deff = FALSE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -102,7 +102,7 @@ test_that("database svyarpt",{
 
   # calculate estimates
   c1 <- svyarpt( ~ eqincome , design = dbd_eusilc , deff = FALSE )
-  c2 <- svyby( ~ eqincome , by = ~hsize , design = dbd_eusilc , FUN = svyarpt , quantiles = 0.5 , percent = 0.6 , deff = FALSE )
+  c2 <- svyby( ~ eqincome , by = ~hsize , design = subset( dbd_eusilc , hsize < 7 ) , FUN = svyarpt , quantiles = 0.5 , percent = 0.6 , deff = FALSE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -114,15 +114,18 @@ test_that("database svyarpt",{
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 ) )
 
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+
 } )
 
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
 sub_des <- svyarpt( ~eqincome , design = subset( des_eusilc , hsize == 1) )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyarpt)
+sby_des <- svyby( ~eqincome, by = ~hsize, design = subset( des_eusilc , hsize < 7 ) , FUN = svyarpt)
 sub_rep <- svyarpt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyarpt)
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = subset( des_eusilc_rep , hsize < 7 ) , FUN = svyarpt)
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -195,9 +198,9 @@ test_that("dbi subsets equal non-dbi subsets",{
 
   # calculate estimates
   sub_dbd <- svyarpt( ~eqincome , design = subset( dbd_eusilc , hsize == 1) )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyarpt)
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = subset( dbd_eusilc , hsize <  7 ) , FUN = svyarpt)
   sub_dbr <- svyarpt( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyarpt)
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = subset( dbd_eusilc_rep , hsize <  7 ) , FUN = svyarpt)
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -215,5 +218,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
   expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
 } )
