@@ -133,11 +133,15 @@ svyfgtdec <-
 svyfgtdec.survey.design <-
   function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, ...){
 
-    # test for convey_prep
+    # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
 
-    # test for threshold type
+    # check for threshold type
     if( type_thresh == "abs" & is.null( abs_thresh ) ) stop( "abs_thresh= must be specified when type_thresh='abs'" )
+
+    # if the class of the full_design attribute is just a TRUE, then the design is
+    # already the full design.  otherwise, pull the full_design from that attribute.
+    if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
 
     # compute fgt estimates
     fgt0 <- svyfgt( formula = formula, design=design, g=0, type_thresh=type_thresh, percent=percent, quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh = thresh )
@@ -148,35 +152,32 @@ svyfgtdec.survey.design <-
     if ( thresh ) thresh.value <- attr( fgt0 , "thresh" )
 
     # income gap ratio
-    fgt0 <- list( value = fgt0[[1]], lin = attr( fgt0 , "lin" ) )
-    fgt1 <- list( value = fgt1[[1]], lin = attr( fgt1 , "lin" ) )
+    fgt0 <- list( value = fgt0[[1]], lin = attr( fgt0 , "influence" ) )
+    fgt1 <- list( value = fgt1[[1]], lin = attr( fgt1 , "influence" ) )
     igr <- contrastinf( quote( fgt1 / fgt0 ) , list( fgt0 = fgt0 , fgt1 = fgt1) )
 
     # generalized entropy index of poverty gaps
     # by residual
-    fgtg <- list( value = fgtg[[1]], lin = attr( fgtg , "lin" ) )
+    fgtg <- list( value = fgtg[[1]], lin = attr( fgtg , "influence" ) )
     gei_poor <- contrastinf( quote( ( fgtg / ( fgt0 * igr^g ) - 1 ) / ( g^2 - g ) ) , list( fgtg =fgtg , fgt0 = fgt0 , fgt1 = fgt1 , igr = igr , g = list( value = g , lin = rep( 0 , length( igr$lin ) ) ) ) )
 
     # matrix of linearized variables
     lin.matrix <- cbind( fgtg$lin, fgt0$lin, fgt1$lin , igr$lin , gei_poor$lin)
     lin.matrix <- as.matrix( lin.matrix )
     colnames(lin.matrix) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
-    if ( length(design$prob) > nrow( lin.matrix ) ) {
-      lin.matrix <- apply( lin.matrix , 2 , function(x) { y = 1/design$prob ; y[ y > 0 ] <- x ; return( y )  } )
-      lin.matrix <- as.matrix( lin.matrix )
-    }
-    if ( length(design$prob) < nrow( lin.matrix ) ) {
-      lin.matrix <- lin.matrix [ as.numeric(rownames(design) ) , ]
+    if ( nrow( lin.matrix ) != length( full_design$prob ) ) {
+      rownames( lin.matrix ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
+      lin.matrix <- lin.matrix[ pmatch( rownames( full_design$variables ) , rownames(lin.matrix ) ) , ]
+      lin.matrix[ 1/full_design$prob <= 0 , ] <- 0
     }
 
     # format objects
     estimates <- c( fgtg$value, fgt0$value, fgt1$value , igr$value , gei_poor$value )
-    variance <- survey::svyrecvar( lin.matrix/design$prob , design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
+    variance <- survey::svyrecvar( lin.matrix/1/full_design$prob , full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata )
 
     # build result object
     rval <- c( estimates )
     names( rval ) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
-    # attr(rval, "SE") <- sqrt(diag(variance) )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt", g , " decomposition")
     if (thresh) attr(rval, "thresh") <- th
@@ -191,6 +192,18 @@ svyfgtdec.survey.design <-
 svyfgtdec.svyrep.design <-
   function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, ...){
 
+    # svyrep design h function
+    h <- function(y,thresh,g) ( ( ( thresh - y ) / thresh )^g ) * ( y <= thresh )
+
+    # svyrep design ComputeFGT function
+    ComputeFGT <-
+      function(y, w, thresh, g){
+        y <- y[w>0]
+        w <- w[w>0]
+        N <- sum(w)
+        sum( w * h( y , thresh , g ) ) / N
+      }
+
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
 
@@ -200,30 +213,6 @@ svyfgtdec.svyrep.design <-
     # if the class of the full_design attribute is just a TRUE, then the design is
     # already the full design.  otherwise, pull the full_design from that attribute.
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
-
-    # svyrep design ComputeIndex functions
-    ComputeFGT <-
-      function( y , w , g , thresh ) {
-        y <- y[ w > 0 ]
-        w <- w[ w > 0 ]
-        N <- sum(w)
-        h <- function(y,thresh,g) ( ( ( thresh - y ) / thresh )^g ) * ( y <= thresh )
-        sum( w * h( y , thresh , g ) ) / N
-      }
-    ComputeGEI <-
-      function( y , w , epsilon ) {
-        w[ y <= 0 ] <- 0
-        y <- y[ w > 0 ]
-        w <- w[ w > 0 ]
-        if ( epsilon == 0 ) {
-          result.est <- -T_fn( y , w , 0 ) / U_fn( y , w , 0 ) + log( U_fn( y , w , 1 ) / U_fn( y , w , 0 ) )
-        } else if ( epsilon == 1 ) {
-          result.est <- ( T_fn( y , w , 1 ) / U_fn( y , w , 1 ) ) - log( U_fn( y , w , 1 ) / U_fn( y , w , 0 ) )
-        } else {
-          result.est <- ( epsilon * ( epsilon - 1 ) )^( -1 ) * ( U_fn( y , w , 0 )^( epsilon - 1 ) * U_fn( y , w , 1 )^( -epsilon ) * U_fn( y , w , epsilon ) - 1 )
-        }
-        result.est
-      }
 
     # collect domain sample data
     df <- model.frame(design)
@@ -270,46 +259,36 @@ svyfgtdec.svyrep.design <-
     fgtg <- ComputeFGT(incvar, ws, g = g , thresh = th )
     igr <- fgt1/fgt0
     gei_poor <- ( ( fgtg / ( fgt0 * igr^g ) - 1 ) / ( g^2 - g ) )
-    estimates <- matrix( c( fgtg, fgt0, fgt1, igr, gei_poor ), dimnames = list( c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) ) ) )[,]
+    estimates <- c( fgtg, fgt0, fgt1, igr, gei_poor )
 
     # colelct full sample analysis weights
     ww <- weights( full_design, "analysis" )
 
     # get replicates
-    qq.fgt0 <- apply( ww, 2, function( wi ) {
+    qq <- apply( ww, 2, function( wi ) {
       if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
       if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
       if(type_thresh=='abs')  thr <- abs_thresh
-      ComputeFGT( incvec , ifelse( rownames( df_full ) %in% ind , wi , 0 ) , g = 0 , thresh = thr )
-      } )
-    qq.fgt1 <- apply( ww, 2, function( wi ) {
-      if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
-      if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
-      if(type_thresh=='abs')  thr <- abs_thresh
-      ComputeFGT( incvec , ifelse( rownames( df_full ) %in% ind , wi , 0 ) , g = 1 , thresh = thr )
-      } )
-    qq.fgtg <- apply( ww, 2, function( wi ) {
-      if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
-      if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
-      if(type_thresh=='abs')  thr <- abs_thresh
-      ComputeFGT( incvec , ifelse( rownames( df_full ) %in% ind , wi , 0 ) , g = g , thresh = thr )
-      } )
-    qq.igr  <- qq.fgt1 / qq.fgt0
-    qq.gei_poor <- ( ( qq.fgtg / ( qq.fgt0 * qq.igr^g ) - 1 ) / ( g^2 - g ) )
-    qq <- cbind( qq.fgtg , qq.fgt0 , qq.fgt1 , qq.igr , qq.gei_poor )
+      c( fgtg = ComputeFGT( incvec , ifelse( rownames( df_full ) %in% ind , wi , 0 ) , g = g , thresh = thr ) ,
+         fgt0 = ComputeFGT( incvec , ifelse( rownames( df_full ) %in% ind , wi , 0 ) , g = 0 , thresh = thr ) ,
+         fgt1 = ComputeFGT( incvec , ifelse( rownames( df_full ) %in% ind , wi , 0 ) , g = 1 , thresh = thr ) )
+    } )
+    qq <- t( qq )
+    qq <- cbind( qq , "igr" = qq[ , "fgt1" ] / qq[ , "fgt0" ] )
+    qq <- cbind( qq , "gei_poor" = ( ( qq[ , "fgtg" ] / ( qq[ , "fgt0" ] * qq[ , "igr" ]^g ) - 1 ) / ( g^2 - g ) ) )
     colnames(qq) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
 
     # compute variance
     if ( anyNA( qq ) ) {
-      variance <- matrix( NA , ncol = 5 , nrow = 5 , dimnames = list( c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) ) , c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) ) ) )  }
-    else {
+      variance <- matrix( NA , ncol = 5 , nrow = 5  )
+    } else {
       variance <- survey::svrVar(qq, full_design$scale, full_design$rscales, mse = full_design$mse, coef = estimates )
     }
+    rownames( variance ) <- colnames( variance ) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
 
     # build result object
     rval <- c( estimates )
     names( rval ) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
-    # attr(rval, "SE") <- sqrt(diag(variance) )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt", g , " decomposition")
     if (thresh) attr(rval, "thresh") <- th
