@@ -18,7 +18,8 @@ dstrat1<-convey_prep(svydesign(id=~1,data=apistrat))
 
 # perform tests
 test_that("svypoormed works on unweighted designs", {
-  svypoormed( ~api00, design=dstrat1 )
+  expect_false( is.na ( coef( svypoormed( ~api00, design=dstrat1 , quantiles = .9 ) ) ) )
+  expect_false( is.na ( SE( svypoormed( ~api00, design=dstrat1 , quantiles = .9 ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- data.frame-backed design object
@@ -36,8 +37,8 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # filter observations
-des_eusilc <- subset( des_eusilc , hsize < 8 )
-des_eusilc_rep <- subset( des_eusilc_rep , hsize < 8 )
+des_eusilc <- subset( des_eusilc , hsize < 7 )
+des_eusilc_rep <- subset( des_eusilc_rep , hsize < 7 )
 
 # calculate estimates
 a1 <- svypoormed( ~eqincome , des_eusilc )
@@ -105,7 +106,7 @@ test_that("database svypoormed",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # filter observations
-  dbd_eusilc <- subset( dbd_eusilc , hsize < 8 )
+  dbd_eusilc <- subset( dbd_eusilc , hsize < 7 )
 
   # calculate estimates
   c1 <- svypoormed( ~eqincome , dbd_eusilc )
@@ -120,6 +121,9 @@ test_that("database svypoormed",{
   expect_equal( coef( a2 ) , coef( c2 ) )
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 ) )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
 
 } )
 
@@ -201,8 +205,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # filter observations
-  dbd_eusilc <- subset( dbd_eusilc , hsize < 8 )
-  dbd_eusilc_rep <- subset( dbd_eusilc_rep , hsize < 8 )
+  dbd_eusilc <- subset( dbd_eusilc , hsize < 7 )
+  dbd_eusilc_rep <- subset( dbd_eusilc_rep , hsize < 7 )
 
   # calculate estimates
   sub_dbd <- svypoormed( ~eqincome , design = subset( dbd_eusilc , hsize == 1) )
@@ -226,5 +230,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
   expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
 } )

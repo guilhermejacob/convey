@@ -97,7 +97,6 @@ test_that("compare results convey vs vardpoor", {
   expect_equal( vardestd , convestd )
 
   # compare SE estimates
-  skip('different poormed se')
   expect_equal( varse  , convse )
   expect_equal( varsed , convsed )
 
