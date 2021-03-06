@@ -143,6 +143,7 @@ svypoormed.survey.design <-
     htot <- h_fun(incvar, w)
     ARPT <- svyarpt(formula = formula, full_design, quantiles = quantiles, percent = percent, na.rm = na.rm)
     arpt <- coef(ARPT)
+    linarpt <- attr(ARPT, "influence")
 
     # treat remaining missing
     if(is.na(arpt)){
@@ -150,15 +151,14 @@ svypoormed.survey.design <-
       variance <- NA
       class(rval) <- c( "cvystat" , "svystat" )
       attr( rval , "var" ) <- variance
-      attr(rval, "lin") <- NA
+      # attr(rval, "influence") <- NA
       attr( rval , "statistic" ) <- "poormed"
       return( rval )
     }
 
-    # calculate linearized variable
-    linarpt <- attr(ARPT, "lin")
+    # below threshold sample domain
     nome <- terms.formula(formula)[[2]]
-    dsub <- eval(substitute(subset(design, incvar <= arpt ),list(incvar = nome, arpt = as.numeric(arpt))))
+    dsub <- eval( substitute ( subset(design, incvar <= arpt ) , list( incvar = nome , arpt = as.numeric( arpt ) ) ) )
     # if( nrow( dsub ) == 0 ) stop( paste("zero records in the set of poor people.  determine the poverty threshold by running svyarpt on ~",nome ) )
     if( nrow( dsub ) == 0 ){
       warning( paste("zero records in the set of poor people.  determine the poverty threshold by running svyarpt on ~",nome ) )
@@ -167,17 +167,25 @@ svypoormed.survey.design <-
       colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
       class(rval) <- c( "cvystat" , "svystat" )
       attr( rval , "var" ) <- variance
-      attr(rval, "lin") <- NA
+      attr(rval, "influence") <- NA
       attr( rval , "statistic" ) <- "poormed"
       return( rval )
     }
+
+    # compute median income of the poor
     medp <- survey::svyquantile(x = formula, dsub, 0.5, method = "constant", na.rm=na.rm,...)
     medp <- as.vector(medp)
-    ARPR <- svyarpr(formula=formula, design= design, quantiles, percent, na.rm = na.rm)
-    Fprimemedp <- densfun(formula = formula, design = design, medp, h = htot, FUN = "F", na.rm = na.rm)
-    arpr <- coef(ARPR)
-    ifarpr <- attr(ARPR, "lin")
+
+    # add indices
     if (sum(1/design$prob==0) > 0) ID <- 1*(1/design$prob!=0) else ID <- 1 * ( ncom %in% ind )
+
+    # compute at risk of poverty rate
+    ARPR <- svyarpr( formula=formula, design= design, quantiles, percent, na.rm = na.rm )
+    arpr <- coef( ARPR )
+    ifarpr <- attr( ARPR, "influence" )
+
+    # compute density
+    Fprimemedp <- densfun(formula = formula, design = design, medp, h = htot, FUN = "F", na.rm = na.rm)
 
     # linearize cdf of medp
     ifmedp <- ( 1 / N ) * ID * ( ( incvec <= medp ) - 0.5 * arpr )
@@ -185,16 +193,27 @@ svypoormed.survey.design <-
     # linearize median of poor
     linmedp <- ( 0.5 * ifarpr - ifmedp ) / Fprimemedp
 
+    # ensure length
+    if ( length( linmedp ) != length( full_design$prob ) ) {
+      names( linmedp ) <- rownames( design$variables )[ w > 0 ]
+      linmedp <- linmedp[ pmatch( rownames( full_design$variables ) , names( linmedp ) ) ]
+      names( linmedp ) <- rownames( full_design$variables )
+      linmedp[ is.na( linmedp ) ] <- 0
+    }
+
     # computte variance
     variance <- survey::svyrecvar(linmedp/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata)
+
+    # keep necessary influence functions
+    linmedp <- linmedp[ 1/full_design$prob > 0 ]
 
     # build result object
     rval <- medp
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
-    class(rval) <- c( "cvystat" , "svystat" )
     attr( rval , "var" ) <- variance
-    attr(rval, "lin") <- linmedp
+    attr(rval, "influence") <- linmedp
     attr( rval , "statistic" ) <- "poormed"
+    class(rval) <- c( "cvystat" , "svystat" )
     rval
 
   }
