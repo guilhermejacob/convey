@@ -223,16 +223,20 @@ svyfgt.survey.design <-
       fgtlin[ is.na( fgtlin ) ] <- 0
     }
 
-    if ( length( fgtlin ) != length( full_design$prob ) ) stop()
-
     # add linearized threshold
-    ahat <- if ( type_thresh == "abs" ) 0 else sum( w * ht( incvar , th , g ) ) / N
+    if (g == 0) {
+      # htot <- h_fun( incvec , wf )
+      ahat <- densfun( formula = formula , design = design , th , h=NULL , FUN = "F" , na.rm = na.rm )
+    } else ahat <- sum( w * ht( incvar , th , g ) ) / N
     fgtlin <- fgtlin + ( ahat * arptlin )
 
     # compute variance
     variance <- survey::svyrecvar( fgtlin/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata )
     variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+    # keep necessary influence functions
+    fgtlin <- fgtlin[ 1/full_design$prob > 0 ]
 
     # setup result object
     rval <- estimate
