@@ -17,12 +17,12 @@ for ( this.g in c(0,1,2) )  {
   data("api")
 
   # set up convey design
-  suppressWarnings( dstrat1<-svydesign(id=~1,data=apistrat) )
-  dstrat1<-convey_prep( dstrat1 )
+  expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
 
   # perform tests
   test_that( paste0( "svyfgt g=", this.g , " works on unweighted designs"), {
-    svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = "abs" )
+    expect_false( is.na ( coef( svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = "abs" ) ) ) )
+    expect_false( is.na ( SE( svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = "abs" ) ) ) )
   } )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
@@ -44,6 +44,8 @@ for ( this.g in c(0,1,2) )  {
   a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" )
   b1 <- svyfgt( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 7000 , type_thresh = "abs" )
   b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" )
+  d1 <- svymean( ~I( ( eqincome <= 7000 ) * ( ( eqincome - 7000 ) / 7000 )^eval(this.g) ) , des_eusilc )
+  d2 <- svyby( ~I( ( eqincome <= 7000 ) * ( ( eqincome - 7000 ) / 7000 )^eval(this.g) ) , ~hsize , des_eusilc , svymean )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -57,6 +59,10 @@ for ( this.g in c(0,1,2) )  {
     expect_is( coef( b2 ) ,"numeric" )
     expect_equal( coef( a1 ) , coef( b1 ) )
     expect_equal( coef( a2 ) , coef( b2 ) )
+    expect_equal( as.numeric( coef( a1 ) ) , abs( as.numeric( coef( d1 ) ) ) )
+    expect_equal( as.numeric( coef( d2 ) ) , as.numeric( coef( d2 ) ) )
+    expect_equal( as.numeric( SE( a1 ) ) , as.numeric( SE( d1 ) ) )
+    expect_equal( as.numeric( SE( d2 ) ) , as.numeric( SE( d2 ) ) )
     # expect_lte( cv_diff1 , coef(a1) * 0.20 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
     expect_lte( se_diff2 , max( coef(a2) ) * 0.20 )  # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
     expect_is( SE( a1 ) , "matrix" )

@@ -23,7 +23,8 @@ for ( this.g in c(0,1,2) )  {
 
   # perform tests
   test_that( paste0( "svyfgt g=", this.g , " works on unweighted designs"), {
-    svyfgt( ~api00, design=dstrat1 , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" )
+    expect_false( is.na ( coef( svyfgt( ~api00, design=dstrat1 , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" ) ) ) )
+    expect_false( is.na ( SE( svyfgt( ~api00, design=dstrat1 , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" ) ) ) )
   } )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
@@ -58,8 +59,10 @@ for ( this.g in c(0,1,2) )  {
     expect_is( coef( b2 ) ,"numeric" )
     expect_equal( coef( a1 ) , coef( b1 ) )
     expect_equal( coef( a2 ) , coef( b2 ) )
-    expect_lte( cv_diff1 , coef(a1) * .20 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
-    expect_lte( se_diff2 , max( coef(a2) ) * .20 ) # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
+    if ( this.g < 2 ) {
+      expect_lte( cv_diff1 , coef(a1) * .05 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
+      expect_lte( se_diff2 , max( coef(a2) ) * .05 )  # the difference between CVs should be less than 5% of the maximum coefficient, otherwise manually set it
+    }
     expect_is( SE( a1 ) , "matrix" )
     expect_is( SE( a2 ) , "numeric" )
     expect_is( SE( b1 ) , "numeric" )
@@ -118,6 +121,9 @@ for ( this.g in c(0,1,2) )  {
     expect_equal( coef( a2 ) , coef( c2 ) )
     expect_equal( SE( a1 ) , SE( c1 ) )
     expect_equal( SE( a2 ) , SE( c2 ) )
+
+    # compare influence functions across data.frame and dbi backed survey design objects
+    expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
 
   } )
 
@@ -220,6 +226,9 @@ for ( this.g in c(0,1,2) )  {
     expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
     expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
     expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+
+    # compare influence functions across data.frame and dbi backed survey design objects
+    expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
   } )
 

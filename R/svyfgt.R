@@ -155,100 +155,92 @@ svyfgt.survey.design <-
     # ht function
     ht <- function( y , thresh , g ) ( g * ( ( ( thresh - y ) / thresh )^( g - 1 ) ) * ( y / ( thresh^2 ) ) ) * ( y <= thresh )
 
-    # collect incomes from domain sample
-    incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+    ### threshold calculation
 
-    # treat missing values
-    if(na.rm){
-      nas<-is.na(incvar)
-      design<-design[!nas,]
-      if (length(nas) > length(design$prob))incvar <- incvar[!nas] else incvar[nas] <- 0
-    }
-
-    # collect domain sample weights
-    w <- 1/design$prob
-
-    # create domain indice
-    if( is.null( names( design$prob ) ) ) ind <- as.character( seq( length( design$prob ) ) ) else ind <- names(design$prob)
-
-    # calculate domain population size
-    N <- sum(w)
-
-    # if the class of the full_design attribute is just a TRUE, then the design is
-    # already the full design.  otherwise, pull the full_design from that attribute.
-    if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
-
-    # collect incomes from full sample
+    # collect income from full sample
     incvec <- model.frame(formula, full_design$variables, na.action = na.pass)[[1]]
 
     # treat missing values
     if(na.rm){
-      nas<-is.na(incvec)
+      nas<-is.na( incvec )
       full_design<-full_design[!nas,]
-      if (length(nas) > length(full_design$prob)) incvec <- incvec[!nas] else incvec[nas] <- 0
+      if ( length(nas) > length( full_design$prob ) ) incvec <- incvec[!nas] else incvec[nas] <- 0
     }
 
-    # collect full samples weights
+    # collect full sample weights
     wf <- 1/full_design$prob
 
-    # create full sample indices
-    if( is.null( names( full_design$prob ) ) ) ncom <- as.character( seq( length( full_design$prob ) ) ) else ncom <- names(full_design$prob)
+    # branch on threshold type and its influence function
+    if( type_thresh == 'relq' ) {
 
-    # calculate h from full sample
-    htot <- h_fun(incvec, wf)
-    if (sum(1/design$prob==0) > 0) ID <- 1*(1/design$prob!=0) else ID <- 1 * ( ncom %in% ind )
+      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, ...)
+      th <- percent * coef(ARPT)[[1]]
+      arptlin <- percent * attr( ARPT , "influence" )
 
-    # calculate linearized variable
-    if( type_thresh == 'relq' ){
+    } else if( type_thresh == 'relm') {
 
-      ARPT <- svyarpt(formula = formula, full_design, quantiles=quantiles, percent=percent,  na.rm=na.rm, ...)
-      th <- coef(ARPT)
-      arptlin <- attr(ARPT, "lin")
-      rval <- sum(w*h(incvar,th,g))/N
-      ahat <- sum(w*ht(incvar,th,g))/N
+      ARPT <- svymean( formula, full_design , influence = TRUE ,  na.rm=na.rm )
+      th <- percent * coef( ARPT )[[1]]
+      arptlin <- percent * as.numeric( attr(ARPT, "influence") )
+      names( arptlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
 
-      if( g == 0 ){
-
-        ARPR <- svyarpr(formula = formula, design, quantiles=quantiles, percent=percent,  na.rm=na.rm, ...)
-        fgtlin <- attr(ARPR,"lin")
-
-      } else fgtlin <-ID*( h( incvec , th , g ) - rval ) / N + ( ahat * arptlin )
-
-    }
-    if( type_thresh == 'relm'){
-
-      # thresh for the whole population
-      th <- percent*sum(incvec*wf)/sum(wf)
-      rval <- sum(w*h(incvar,th,g))/N
-      ahat <- sum(w*ht(incvar,th,g))/N
-
-      if( g == 0 ){
-
-        Fprime <- densfun(formula=formula, design = design, x= th, FUN = "F", na.rm = na.rm )
-        fgtlin<- ID*(h(incvec,th,g)-rval + Fprime*(incvec-th))/N
-
-      } else fgtlin <-ID*( h( incvec , th , g ) - rval + ( ( percent * incvec ) - th ) * ahat ) / N
-
-    }
-    if( type_thresh == 'abs' ){
-
+    } else if ( type_thresh == 'abs' ) {
       th <- abs_thresh
-
-      rval <- sum( w*h( incvar , th , g ) ) / N
-
-      fgtlin <- ID*( h( incvec , th , g ) - rval ) / N
-
+      arptlin <- rep( 0 , sum( wf > 0 ) )
     }
 
-    # estimate variance from linearized variable
-    variance <- survey::svyrecvar(fgtlin/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata)
+    ### domain poverty measure estimate
+
+    # collect income from domain sample
+    incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+
+    # treat missing values
+    if ( na.rm ){
+      nas <- is.na( incvar )
+      design <- design[!nas,]
+      if ( length(nas) > length( full_design$prob ) ) incvar <- incvar[!nas] else incvar[nas] <- 0
+    }
+
+    # collect full sample weights
+    w <- 1/design$prob
+
+    # domain population size
+    N <- sum( w )
+
+    # compute value
+    estimate <- sum( w * h( incvar , th , g ) ) / N
+
+    ### linearization
+
+    # compute linearized variable under fixed threshold
+    fgtlin <- ( w > 0 ) * ( h( incvar , th , g ) - estimate ) / N
+
+    # ensure length
+    if ( length( fgtlin ) != length( full_design$prob ) ) {
+      names( fgtlin ) <- rownames( design$variables )[ w > 0 ]
+      fgtlin <- fgtlin[ pmatch( rownames( full_design$variables ) , names( fgtlin ) ) ]
+      names( fgtlin ) <- rownames( full_design$variables )
+      fgtlin[ is.na( fgtlin ) ] <- 0
+    }
+
+    if ( length( fgtlin ) != length( full_design$prob ) ) stop()
+
+    # add linearized threshold
+    ahat <- if ( type_thresh == "abs" ) 0 else sum( w * ht( incvar , th , g ) ) / N
+    fgtlin <- fgtlin + ( ahat * arptlin )
+
+    # compute variance
+    variance <- survey::svyrecvar( fgtlin/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata )
+    variance[ which( is.nan( variance ) ) ] <- NA
+    colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # setup result object
+    rval <- estimate
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt",g)
-    attr(rval, "lin") <- fgtlin
+    attr(rval, "influence") <- fgtlin
     if(thresh) attr(rval, "thresh") <- th
     rval
 
@@ -326,19 +318,19 @@ svyfgt.svyrep.design <-
     # collect full sample analysis weights
     wwf <- weights(full_design, "analysis")
 
-    # calcualge replicates
-    qq <-
-      apply( wwf, 2, function(wi) {
+    # calculate replicates
+    qq <- apply( wwf, 2, function(wi) {
 
-        names( wi ) <- row.names( df_full )
+      names( wi ) <- row.names( df_full )
 
-        if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
-        if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
-        if(type_thresh=='abs')  thr <- abs_thresh
+      if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
+      if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
+      if(type_thresh=='abs')  thr <- abs_thresh
+      wsi <- ifelse( names( wi ) %in% names( ws ) , wi , 0 )
 
-        ComputeFGT( incvec , ifelse( names(wi) %in% ind , wi , 0 ), g = g , thr )
+      ComputeFGT( incvec , wsi , g = g , thr )
 
-      } )
+    } )
 
     # calculate variance
     if ( anyNA(qq) ) variance <- NA else variance <- survey::svrVar( qq, full_design$scale , full_design$rscales, mse = full_design$mse, coef = rval )
@@ -349,7 +341,6 @@ svyfgt.svyrep.design <-
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt",g)
-    attr(rval, "lin") <- NA
     if(thresh) attr(rval, "thresh") <- th
     rval
 
