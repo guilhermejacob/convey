@@ -114,7 +114,7 @@ svyarpr.survey.design <-
     }
 
     # collect domain index
-    if( is.null( names( design$prob ) ) ) ind <- as.character( seq( length( design$prob ) ) ) else ind <- names(design$prob)
+    if( is.null( rownames( design$variables ) ) ) ind <- as.character( seq( length( design$prob ) ) ) else ind <- rownames( design$variables )[ 1/design$prob > 0 ]
 
     # collect (domain) weights
     w <- 1/design$prob
@@ -148,38 +148,53 @@ svyarpr.survey.design <-
     # estimate at risk of poverty threshold
     ARPT <- svyarpt( formula = formula , design = full_design , quantiles = quantiles , percent = percent , na.rm = na.rm , ... )
     arptv <- coef( ARPT )
-    arptlin <- attr( ARPT , "lin" )
+    arptlin <- attr( ARPT , "influence" )
+
+    # # ensure length of linearization vector
+    # if ( length( arptlin ) != length( full_design$prob ) ) {
+    #   names( arptlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
+    #   arptlin <- arptlin[ pmatch( rownames( full_design$variables ) , names( arptlin ) ) ]
+    #   names( arptlin ) <- rownames( full_design$variables )
+    #   arptlin[ is.na( arptlin ) ] <- 0
+    # }
 
     # value of arpr
     poor <- incvar <= arptv
     rval <- sum( poor * w ) / N
 
     # first term of linearized variable
-    if ( sum( w == 0 ) > 0 ) ID <- 1*( w != 0 ) else ID <- 1 * ( ncom %in% ind )
-    arpr1lin <- ( 1 / N ) * ID * ( ( incvec <= arptv ) - rval )
+    ID <- 1 * ( ncom %in% ind )
+    arpr1lin <- ID * ( ( incvec <= arptv ) - rval ) / N
 
-    # use h for the whole sample
-    Fprime <- densfun( formula = formula , design = full_design , arptv , h=htot , FUN = "F" , na.rm = na.rm )
-    # Fprime <- vardpoor:::gaussian_kern( incvec , wf , quantiles , hh = htot ) # match vardpoor
+    # calculate Fprime for the domain
+    Fprime <- densfun( formula = formula , design = design , arptv[[1]] , h=NULL , FUN = "F" , na.rm = na.rm )
 
     # calculate linearized variable
     arprlin <- arpr1lin + Fprime * arptlin
 
-    # calculate variance
-    variance <-
-      survey::svyrecvar(
-        arprlin/full_design$prob ,
-        full_design$cluster ,
-        full_design$strata ,
-        full_design$fpc ,
-        postStrata = full_design$postStrata )
+    # ensure length of linearization vector
+    if ( length( arprlin ) != length( full_design$prob ) ) {
+      names( arprlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
+      # names( arprlin ) <- rownames( design$variables )[ 1/design$prob > 0 ]
+      arprlin <- arprlin[ pmatch( rownames( full_design$variables ) , names( arprlin ) ) ]
+      names( arprlin ) <- rownames( full_design$variables )
+      arprlin[ is.na( arprlin ) ] <- 0
+    }
+
+    # compute variance
+    variance <- survey::svyrecvar( arprlin/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata )
+    variance[ which( is.nan( variance ) ) ] <- NA
+    colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+    # keep necessary influence functions
+    arprlin <- arprlin[ 1/full_design$prob > 0 ]
 
     # build result object
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "arpr"
-    attr(rval, "lin") <- arprlin
+    attr(rval, "influence") <- arprlin
     rval
 
   }
