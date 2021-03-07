@@ -6,6 +6,7 @@
 #' @param formula a formula specifying the income variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
 #' @param alpha the order of the quantile
+#' @param upper return the total in the total in the upper tail. Defaults to \code{FALSE}.
 #' @param quantile return the upper bound of the lower tail
 #' @param na.rm Should cases with missing values be dropped?
 #' @param ... arguments passed on to `survey::svyquantile`
@@ -92,7 +93,7 @@ svyisq <-
 #' @rdname svyisq
 #' @export
 svyisq.survey.design <-
-	function(formula, design, alpha, quantile = FALSE, na.rm = FALSE,...) {
+	function(formula, design, alpha, quantile = FALSE, upper = FALSE , na.rm = FALSE,...) {
 
 	  # test for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -117,12 +118,14 @@ svyisq.survey.design <-
 
 	  # compute value
 	  estimate <- CalcISQ( incvar , w , alpha )
+	  if (upper) estimate <- sum( w * incvar ) - estimate
 
 	  # compute influence functions
 	  h <- h_fun(incvar, w)
 	  Fprime0 <- densfun( formula = formula, design = design, q_alpha[[1]] , FUN = "F",     na.rm = na.rm )
 	  Fprime1 <- densfun( formula = formula, design = design, q_alpha[[1]] , FUN = "big_s", na.rm = na.rm )
 	  lin <- CalcISQ_IF( incvar , w, alpha , Fprime0 , Fprime1 )
+	  if (upper) lin <- incvar - lin
 
 	  # treat out of sample
 	  if ( length( lin ) != length( design$prob ) ) {
@@ -154,7 +157,7 @@ svyisq.survey.design <-
 #' @rdname svyisq
 #' @export
 svyisq.svyrep.design <-
-	function(formula, design, alpha,quantile = FALSE, na.rm = FALSE,...){
+	function(formula, design, alpha,quantile = FALSE, upper = FALSE , na.rm = FALSE,...){
 
 	  # check for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -178,12 +181,15 @@ svyisq.svyrep.design <-
 
 	  # compute point estimate
 	  estimate <- CalcISQ( incvar , ws, alpha )
+	  if (upper) estimate <- sum( ws * incvar ) - estimate
 
 	  # collect analysis weights
 	  ww <- weights(design, "analysis")
 
 	  # compute replicates
-	  qq <- apply( ww, 2 , function(wi) CalcISQ( incvar , wi , alpha ) )
+	  qq <- apply( ww, 2 , function(wi) {
+	    if ( upper ) sum( wi * incvar ) - CalcISQ( incvar , wi , alpha ) else CalcISQ( incvar , wi , alpha )
+	  } )
 
 	  # compute variance
 	  if ( any( is.na( qq ) ) ) variance <- as.matrix( NA ) else {
