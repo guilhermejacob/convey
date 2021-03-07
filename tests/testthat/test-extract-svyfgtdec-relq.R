@@ -6,7 +6,7 @@ library( testthat )
 # library( vardpoor )
 
 # return test context
-context("fgt-relq decomposition output survey.design and svyrep.design")
+context("fgtdec-relq decomposition output survey.design and svyrep.design")
 
 ### test 2: income data from eusilc --- data.frame-backed design object
 
@@ -23,17 +23,23 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svyfgtdec( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-b1 <- svyfgtdec( ~eqincome , des_eusilc_rep , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
+a1 <- svyfgtdec( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+b1 <- svyfgtdec( ~eqincome , des_eusilc_rep , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+d1 <- svyfgt( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+d2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+e1 <- svyfgt( ~eqincome , des_eusilc , g = 0 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+e2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 0 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+f1 <- svyfgt( ~eqincome , des_eusilc , g = 1 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+f2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 1 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ))
 se_diff2 <- max( abs( SE( a2 ) - SE( b2 ) ) , na.rm = TRUE )
 
 # perform tests
-test_that( "output svyfgt" , {
+test_that( "output svyfgtdec" , {
   expect_is( coef( a1 ) ,"numeric" )
   expect_is( coef( a2 ) , "numeric" )
   expect_is( coef( b1 ) ,"numeric" )
@@ -46,12 +52,18 @@ test_that( "output svyfgt" , {
   expect_equal( sum( confint( a2 )[,2] >= coef( a2 ) ) , length( coef( a2 ) ) )
   expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
+  expect_equal( coef( a1 )[[1]] , coef( d1 )[[1]] )
+  expect_equal( SE( a1 )[[1]] , SE( d1 )[[1]] )
+  expect_equal( coef( a1 )[[2]] , coef( e1 )[[1]] )
+  expect_equal( SE( a1 )[[2]] , SE( e1 )[[1]] )
+  expect_equal( coef( a1 )[[3]] , coef( f1 )[[1]] )
+  expect_equal( SE( a1 )[[3]] , SE( f1 )[[1]] )
 } )
 
 ### test 2: income data from eusilc --- database-backed design object
 
 # perform tests
-test_that("database svyfgt",{
+test_that("database svyfgtdec",{
 
   # skip test on cran
   skip_on_cran()
@@ -80,8 +92,8 @@ test_that("database svyfgt",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svyfgtdec( ~eqincome , dbd_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
+  c1 <- svyfgtdec( ~eqincome , dbd_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -98,10 +110,10 @@ test_that("database svyfgt",{
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyfgtdec( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-sub_rep <- svyfgtdec( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
+sub_des <- svyfgtdec( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+sub_rep <- svyfgtdec( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -173,10 +185,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-  sub_dbr <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
-  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , subgroup = ~db040 )
+  sub_dbd <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+  sub_dbr <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )

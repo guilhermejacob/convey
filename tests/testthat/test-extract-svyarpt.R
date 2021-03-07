@@ -18,7 +18,8 @@ dstrat1<-convey_prep(svydesign(id=~1,data=apistrat))
 
 # perform tests
 test_that("svyarpt works on unweighted designs", {
-  svyarpt( ~api00, design=dstrat1 )
+  expect_false( is.na ( coef( svyarpt( ~api00, design=dstrat1 ) ) ) )
+  expect_false( is.na ( SE( svyarpt( ~api00, design=dstrat1 ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- data.frame-backed design object

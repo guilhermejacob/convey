@@ -184,6 +184,14 @@ svypoormed.survey.design <-
     arpr <- coef( ARPR )
     ifarpr <- attr( ARPR, "influence" )
 
+    # treat out of sample
+    if ( length( ifarpr ) != length( full_design$prob ) ) {
+      names( ifarpr ) <- rownames( design$variables )[ w > 0 ]
+      ifarpr <- ifarpr[ pmatch( rownames( full_design$variables ) , names(ifarpr) ) ]
+      names( ifarpr ) <- rownames( full_design$variables )
+      ifarpr[ is.na( ifarpr ) ] <- 0
+    }
+
     # compute density
     Fprimemedp <- densfun(formula = formula, design = design, medp, h = htot, FUN = "F", na.rm = na.rm)
 

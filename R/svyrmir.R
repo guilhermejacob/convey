@@ -162,20 +162,21 @@ svyrmir.survey.design  <-
     MED2 <- list(value = q_alpha2[[1]] , lin = rep( 0 , length( w ) ) )
 
     # add partial linearizations
-    MED1$lin [ ind1 ] <- attr( q_alpha1 , "influence" )
-    MED2$lin [ ind2 ] <- attr( q_alpha2 , "influence" )
+    MED1$lin [ ind1 & w>0 ] <- attr( q_alpha1 , "influence" )
+    MED2$lin [ ind2 & w>0 ] <- attr( q_alpha2 , "influence" )
     list_all<- list(MED1=MED1, MED2=MED2)
 
     # linearize ratio of medians
     RMED <- contrastinf(quote(MED2/MED1),list_all)
     lin <- as.numeric( RMED$lin )
-    names( lin ) <- rownames( design$variables )[ w > 0 ]
+    names( lin ) <- rownames( design$variables )
 
     # treat out of sample
     if ( length( lin ) != length( design$prob ) ) {
       lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
       lin[ w <= 0] <- 0
       names( lin ) <- rownames( design$variables )
+      lin[ is.na( lin ) ] <- 0
     }
 
     # compute variance

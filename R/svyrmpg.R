@@ -142,7 +142,15 @@ svyrmpg.survey.design <-
 
 		# linearize RMPG
 		RMPG <- contrastinf( quote( 1 - MEDP / ARPT ) , list_all )
-		infun <- unlist(RMPG$lin)
+		infun <- as.numeric(RMPG$lin)
+
+		# ensure length
+		if ( length( infun ) != length( full_design$prob ) ) {
+		  names( infun ) <- rownames( design$variables )[ 1/design$prob > 0 ]
+		  infun <- infun[ pmatch( rownames( full_design$variables ) , names( infun ) ) ]
+		  names( infun ) <- rownames( full_design$variables )
+		  infun[ is.na( infun ) ] <- 0
+		}
 
 		# compute variance
 		variance <- survey::svyrecvar(infun/full_design$prob, full_design$cluster,full_design$strata, full_design$fpc,postStrata = full_design$postStrata)

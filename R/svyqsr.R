@@ -132,23 +132,21 @@ svyqsr.survey.design <-
     # test division by zero
     if( S20$value == 0 ) stop( paste0( "division by zero. the alpha1=" , alpha1 , " percentile cannot be zero or svyqsr would return Inf" ) )
 
-    # Linearization of S80
-    S80 <- svyisq(formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE )
-    qS80 <- attr(S80, "quantile")
-    totS80 <- coef(S80)
-    attributes(totS80) <- NULL
-    S80 <- list(value=totS80[[1]], lin=attr(S80,"influence"))
-
-    # build total
-    TOT <- list(value=sum(incvar*w), lin=incvar)
+    # Linearization of S80C
+    S80C <- svyisq(formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE , upper = TRUE )
+    qS80C <- attr(S80C, "quantile")
+    totS80C <- coef(S80C)
+    attributes(totS80C) <- NULL
+    S80C <- list(value=totS80C[[1]], lin=attr(S80C,"influence"))
 
     # ensure consistent lengths
-    stopifnot( length( unique( sapply( lapply( list( S80 , S20 , TOT ) , `[[` , "lin" ) , length ) ) ) <= 1 )
+    if ( length( unique( sapply( lapply( list( S80C , S20 ) , `[[` , "lin" ) , length ) ) ) != 1 ) stop()
 
     # LINEARIZED VARIABLE OF THE SHARE RATIO
-    list_all <- list(TOT=TOT, S20 = S20, S80 = S80)
-    QSR <- contrastinf( quote((TOT-S80)/S20), list_all)
-    lin <- as.vector(QSR$lin)
+    list_all <- list( S20 = S20 , S80C = S80C )
+    QSR <- contrastinf( quote(S80C/S20), list_all)
+    lin <- as.numeric(QSR$lin)
+    names(lin) <- names(w)[w > 0]
 
     # treat out of sample
     if ( length( lin ) != length( design$prob ) ) {

@@ -150,13 +150,13 @@ svyarpr.survey.design <-
     arptv <- coef( ARPT )
     arptlin <- attr( ARPT , "influence" )
 
-    # # ensure length of linearization vector
-    # if ( length( arptlin ) != length( full_design$prob ) ) {
-    #   names( arptlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
-    #   arptlin <- arptlin[ pmatch( rownames( full_design$variables ) , names( arptlin ) ) ]
-    #   names( arptlin ) <- rownames( full_design$variables )
-    #   arptlin[ is.na( arptlin ) ] <- 0
-    # }
+    # ensure length of linearization vector
+    if ( length( arptlin ) != length( full_design$prob ) ) {
+      names( arptlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
+      arptlin <- arptlin[ pmatch( rownames( full_design$variables ) , names( arptlin ) ) ]
+      names( arptlin ) <- rownames( full_design$variables )
+      arptlin[ is.na( arptlin ) ] <- 0
+    }
 
     # value of arpr
     poor <- incvar <= arptv

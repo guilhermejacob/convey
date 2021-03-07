@@ -9,9 +9,25 @@
 \usage{
 svyisq(formula, design, ...)
 
-\method{svyisq}{survey.design}(formula, design, alpha, quantile = FALSE, na.rm = FALSE, ...)
+\method{svyisq}{survey.design}(
+  formula,
+  design,
+  alpha,
+  quantile = FALSE,
+  upper = FALSE,
+  na.rm = FALSE,
+  ...
+)
 
-\method{svyisq}{svyrep.design}(formula, design, alpha, quantile = FALSE, na.rm = FALSE, ...)
+\method{svyisq}{svyrep.design}(
+  formula,
+  design,
+  alpha,
+  quantile = FALSE,
+  upper = FALSE,
+  na.rm = FALSE,
+  ...
+)
 
 \method{svyisq}{DBIsvydesign}(formula, design, ...)
 }
@@ -25,6 +41,8 @@ svyisq(formula, design, ...)
 \item{alpha}{the order of the quantile}
 
 \item{quantile}{return the upper bound of the lower tail}
+
+\item{upper}{return the total in the total in the upper tail. Defaults to \code{FALSE}.}
 
 \item{na.rm}{Should cases with missing values be dropped?}
 }

@@ -1,7 +1,12 @@
+# load libraries
 library(survey)
 library(convey)
+library(testthat)
 
+# options( warn = 2 )
+# options( error = recover )
 
+# run tests
 test_that("functions work on weird distributions" , {
 
   skip_on_cran()
@@ -37,9 +42,11 @@ test_that("functions work on weird distributions" , {
 
       FUN <- get( this_function )
 
-      unwtd_des <- convey_prep( svydesign( ~ 1 , data = dist_frame ) )
-      binom_des <- convey_prep( svydesign( ~ 1 , data = dist_frame , weight = ~ wt_binom ) )
-      unif_des <- convey_prep( svydesign( ~ 1 , data = dist_frame , weight = ~ wt_unif ) )
+      suppressWarnings( {
+        unwtd_des <- convey_prep( svydesign( ~ 1 , data = dist_frame ) )
+        binom_des <- convey_prep( svydesign( ~ 1 , data = dist_frame , weight = ~ wt_binom ) )
+        unif_des <- convey_prep( svydesign( ~ 1 , data = dist_frame , weight = ~ wt_unif ) )
+      } )
 
       unwtd_rep <- convey_prep( as.svrepdesign( unwtd_des , type = 'bootstrap' ) )
       binom_rep <- convey_prep( as.svrepdesign( binom_des , type = 'bootstrap' ) )
@@ -119,7 +126,7 @@ test_that("functions work on weird distributions" , {
             lin_res <- do.call( FUN , lin_params_list )
             rep_res <- do.call( FUN , rep_params_list )
 
-            print( paste( "testing functions work on weird distributions" , this_function , this_prefix , as.character( this_formula )[2] ) )
+            cat( paste( "testing functions work on weird distributions" , this_function , this_prefix , as.character( this_formula )[2] , "\n" ) )
 
             # result should give some non-missing number
             expect_that( coef( lin_res ) , is.numeric )

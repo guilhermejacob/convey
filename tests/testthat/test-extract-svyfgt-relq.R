@@ -59,7 +59,7 @@ for ( this.g in c(0,1,2) )  {
     expect_is( coef( b2 ) ,"numeric" )
     expect_equal( coef( a1 ) , coef( b1 ) )
     expect_equal( coef( a2 ) , coef( b2 ) )
-    if ( this.g < 2 ) {
+    if ( this.g < 1 ) {
       expect_lte( cv_diff1 , coef(a1) * .05 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
       expect_lte( se_diff2 , max( coef(a2) ) * .05 )  # the difference between CVs should be less than 5% of the maximum coefficient, otherwise manually set it
     }

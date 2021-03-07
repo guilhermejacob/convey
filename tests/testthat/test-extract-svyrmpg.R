@@ -101,6 +101,9 @@ test_that("database svyrmpg",{
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 )[ match( names( coef ( c2 ) ) , names( coef ( a2 ) ) ) ] )
 
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+
 } )
 
 ### test 3: compare subsetted objects to svyby objects
@@ -202,5 +205,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[2] )
   expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[2] )
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[2] )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
 } )

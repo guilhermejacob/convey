@@ -21,8 +21,8 @@ for ( this.g in c(0,1,2) )  {
 
   # perform tests
   test_that( paste0( "svyfgt g=", this.g , " works on unweighted designs"), {
-    expect_false( is.na ( coef( svyfgt( ~api00, design=dstrat1 , g = this.g , percent = 0.6 , type_thresh = "relm" ) ) ) )
-    expect_false( is.na ( SE( svyfgt( ~api00, design=dstrat1 , g = this.g , percent = 0.6 , type_thresh = "relm" ) ) ) )
+    expect_false( is.na ( coef( svyfgt( ~api00, design=dstrat1 , g = this.g , percent = .60 , type_thresh = "relm" ) ) ) )
+    expect_false( is.na ( SE( svyfgt( ~api00, design=dstrat1 , g = this.g , percent = .60 , type_thresh = "relm" ) ) ) )
   } )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
@@ -40,10 +40,10 @@ for ( this.g in c(0,1,2) )  {
   des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
   # calculate estimates
-  a1 <- svyfgt( ~eqincome , des_eusilc , g = this.g , percent = 0.6 , type_thresh = "relm" )
-  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
-  b1 <- svyfgt( ~eqincome , des_eusilc_rep , g = this.g , percent = 0.6 , type_thresh = "relm" )
-  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
+  a1 <- svyfgt( ~eqincome , des_eusilc , g = this.g , percent = .60 , type_thresh = "relm" )
+  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
+  b1 <- svyfgt( ~eqincome , des_eusilc_rep , g = this.g , percent = .60 , type_thresh = "relm" )
+  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -105,8 +105,8 @@ for ( this.g in c(0,1,2) )  {
     dbd_eusilc <- convey_prep( dbd_eusilc )
 
     # calculate estimates
-    c1 <- svyfgt( ~eqincome , dbd_eusilc , g = this.g , percent = 0.6 , type_thresh = "relm" )
-    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
+    c1 <- svyfgt( ~eqincome , dbd_eusilc , g = this.g , percent = .60 , type_thresh = "relm" )
+    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
 
     # remove table and close connection to database
     dbRemoveTable( conn , 'eusilc' )
@@ -118,15 +118,18 @@ for ( this.g in c(0,1,2) )  {
     expect_equal( SE( a1 ) , SE( c1 ) )
     expect_equal( SE( a2 ) , SE( c2 ) )
 
+    # compare influence functions across data.frame and dbi backed survey design objects
+    expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+
   } )
 
   ### test 3: compare subsetted objects to svyby objects
 
   # calculate estimates
-  sub_des <- svyfgt( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , percent = 0.6 , type_thresh = "relm" )
-  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
-  sub_rep <- svyfgt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , percent = 0.6 , type_thresh = "relm" )
-  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
+  sub_des <- svyfgt( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , percent = .60 , type_thresh = "relm" )
+  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
+  sub_rep <- svyfgt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , percent = .60 , type_thresh = "relm" )
+  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
 
   # perform tests
   test_that("subsets equal svyby",{
@@ -198,10 +201,10 @@ for ( this.g in c(0,1,2) )  {
     dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
     # calculate estimates
-    sub_dbd <- svyfgt( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , percent = 0.6 , type_thresh = "relm" )
-    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
-    sub_dbr <- svyfgt( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , percent = 0.6 , type_thresh = "relm" )
-    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyfgt , g = this.g , percent = 0.6 , type_thresh = "relm" )
+    sub_dbd <- svyfgt( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , percent = .60 , type_thresh = "relm" )
+    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
+    sub_dbr <- svyfgt( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , percent = .60 , type_thresh = "relm" )
+    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyfgt , g = this.g , percent = .60 , type_thresh = "relm" )
 
     # remove table and disconnect from database
     dbRemoveTable( conn , 'eusilc' )
@@ -219,6 +222,9 @@ for ( this.g in c(0,1,2) )  {
     expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
     expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
     expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+
+    # compare influence functions across data.frame and dbi backed survey design objects
+    expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
 
   } )
 

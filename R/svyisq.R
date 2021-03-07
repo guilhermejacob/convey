@@ -125,12 +125,13 @@ svyisq.survey.design <-
 	  Fprime0 <- densfun( formula = formula, design = design, q_alpha[[1]] , FUN = "F",     na.rm = na.rm )
 	  Fprime1 <- densfun( formula = formula, design = design, q_alpha[[1]] , FUN = "big_s", na.rm = na.rm )
 	  lin <- CalcISQ_IF( incvar , w, alpha , Fprime0 , Fprime1 )
-	  if (upper) lin <- incvar - lin
+	  if (upper) lin <- incvar[ w > 0 ] - lin
 
 	  # treat out of sample
 	  if ( length( lin ) != length( design$prob ) ) {
 	    names( lin ) <- rownames( design$variables )[ w > 0 ]
 	    lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
+	    names( lin ) <- rownames( design$variables )
 	    lin[ w <= 0] <- 0
 	  }
 
