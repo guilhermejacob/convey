@@ -1,6 +1,6 @@
 #' FGT measure of poverty
 #'
-#' Estimate the FGT measure for the cases: \code{alpha=0} headcount ratio and \code{alpha=1} poverty gap index.
+#' Estimate the FGT measure.
 #'
 #' @param formula a formula specifying the income variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
@@ -16,9 +16,15 @@
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
 #'
+#' The FGT poverty measures have three special cases.
+#' When \code{g = 0}, the FGT measure is the headcount poverty rate, assigning the same "poverty-weight" to all persons below the poverty line.
+#' When \code{g = 1}, it becomes the poverty gap ratio, a measure which accounts for the intensity of income shortfall among the poor.
+#' When \code{g = 2}. it becomes the squared poverty gap ratio, a measure that also accounts for inequality of poverty intesity across the poor.
+#' The \code{g} is a poverty sensitivity parameter, adding more weight to people with greater income shortfalls as it increases.
+#'
 #' @return Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.
 #'
-#' @author Djalma Pessoa and Anthony Damico
+#' @author Djalma Pessoa, Anthony Damico and Guilherme Jacob
 #'
 #' @seealso \code{\link{svyarpt}}
 #'
