@@ -129,6 +129,19 @@ svyqsr.survey.design <-
     attributes(totS20) <- NULL
     S20 <- list(value= totS20[[1]], lin=attr(S20,"influence"))
 
+    # treat missing
+    if ( is.na( totS20 ) ) {
+      rval <- as.numeric( NA )
+      variance <- as.matrix( NA )
+      colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+      names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+      class(rval) <- c( "cvystat" , "svystat" )
+      attr(rval, "var") <- variance
+      attr(rval, "statistic") <- "qsr"
+      # attr(rval, "influence") <- lin
+      return( rval )
+    }
+
     # test division by zero
     if( S20$value == 0 ) stop( paste0( "division by zero. the alpha1=" , alpha1 , " percentile cannot be zero or svyqsr would return Inf" ) )
 
@@ -221,6 +234,19 @@ svyqsr.svyrep.design <-
 
     # compute point estimate
     Qsr_val <- ComputeQsr(incvar, ws, alpha1 = alpha1, alpha2= alpha2)
+
+    # treat missing
+    if ( is.na( Qsr_val[[4]] ) ) {
+      rval <- as.numeric( NA )
+      variance <- as.matrix( NA )
+      colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+      names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+      class(rval) <- c( "cvystat" , "svystat" )
+      attr(rval, "var") <- variance
+      attr(rval, "statistic") <- "qsr"
+      # attr(rval, "influence") <- lin
+      return( rval )
+    }
 
     # test for division by zero
     if( Qsr_val[4] == 0 ) stop( paste0( "division by zero. the alpha1=" , alpha1 , " percentile cannot be zero or svyqsr would return Inf" ) )

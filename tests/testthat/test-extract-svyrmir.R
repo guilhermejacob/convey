@@ -23,10 +23,10 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svyrmir( ~eqincome , des_eusilc , age = ~age , agelim = 65 )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyrmir , age = ~age , agelim = 65 )
-b1 <- svyrmir( ~eqincome , des_eusilc_rep , age = ~age , agelim = 65 )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyrmir , age = ~age , agelim = 65 )
+a1 <- svyrmir( ~eqincome , des_eusilc , age = ~age , agelim = 40 )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyrmir , age = ~age , agelim = 40 )
+b1 <- svyrmir( ~eqincome , des_eusilc_rep , age = ~age , agelim = 40 )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyrmir , age = ~age , agelim = 40 )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -88,8 +88,8 @@ test_that("database svyrmir",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svyrmir( ~ eqincome , design = dbd_eusilc , age = ~age , agelim = 65 )
-  c2 <- svyby( ~ eqincome , by = ~hsize , design = dbd_eusilc , FUN = svyrmir , age = ~age , agelim = 65 )
+  c1 <- svyrmir( ~ eqincome , design = dbd_eusilc , age = ~age , agelim = 40 )
+  c2 <- svyby( ~ eqincome , by = ~hsize , design = dbd_eusilc , FUN = svyrmir , age = ~age , agelim = 40 )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -109,10 +109,10 @@ test_that("database svyrmir",{
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyrmir( ~eqincome , design = subset( des_eusilc , hsize == 1) , age = ~age , agelim = 65 )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyrmir , age = ~age , agelim = 65)
-sub_rep <- svyrmir( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , age = ~age , agelim = 65 )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyrmir , age = ~age , agelim = 65 )
+sub_des <- svyrmir( ~eqincome , design = subset( des_eusilc , hsize == 1) , age = ~age , agelim = 40 )
+sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyrmir , age = ~age , agelim = 40)
+sub_rep <- svyrmir( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , age = ~age , agelim = 40 )
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyrmir , age = ~age , agelim = 40 )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -184,10 +184,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svyrmir( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , age = ~age , agelim = 65 )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyrmir , age = ~age , agelim = 65 )
-  sub_dbr <- svyrmir( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , age = ~age , agelim = 65 )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyrmir , age = ~age , agelim = 65 )
+  sub_dbd <- svyrmir( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , age = ~age , agelim = 40 )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyrmir , age = ~age , agelim = 40 )
+  sub_dbr <- svyrmir( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , age = ~age , agelim = 40 )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyrmir , age = ~age , agelim = 40 )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )

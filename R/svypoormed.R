@@ -148,10 +148,10 @@ svypoormed.survey.design <-
     # treat remaining missing
     if(is.na(arpt)){
       rval <- NA
-      variance <- NA
+      variance <- as.matrix( NA )
+      colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
       class(rval) <- c( "cvystat" , "svystat" )
       attr( rval , "var" ) <- variance
-      # attr(rval, "influence") <- NA
       attr( rval , "statistic" ) <- "poormed"
       return( rval )
     }

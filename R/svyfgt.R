@@ -346,6 +346,17 @@ svyfgt.svyrep.design <-
 
     } )
 
+    # treat missing
+    if ( anyNA( qq ) ) {
+      variance <-  as.matrix( NA )
+      names( rval ) <- names( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+      class(rval) <- c( "cvystat" , "svrepstat" )
+      attr( rval , "var" ) <- variance
+      attr(rval, "statistic") <- paste0("fgt",g)
+      if(thresh) attr(rval, "thresh") <- th
+      return( rval )
+    }
+
     # calculate variance
     variance <- survey::svrVar( qq, full_design$scale , full_design$rscales, mse = full_design$mse, coef = rval )
 

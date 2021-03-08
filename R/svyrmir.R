@@ -137,21 +137,21 @@ svyrmir.survey.design  <-
 
     ### < 65 yo median income
     dsub1 <- eval( substitute( within_function_subset( design , age < agelim ) , list( age = age.name, agelim = agelim ) ) )
-    if( nrow( dsub1 ) == 0 ) stop( "zero records in the set of non-elderly people" )
+    if( sum( 1/dsub1$prob > 0 ) == 0 ) stop( "zero records in the set of non-elderly people" )
     if( "DBIsvydesign" %in% class( dsub1 ) ) {
-      ind1 <- names(design$prob) %in% which(is.finite(dsub1$prob) )
+      ind1 <- rownames( design$variables ) %in% which(is.finite( dsub1$prob ) )
     } else{
-      ind1 <- names(design$prob) %in% names(dsub1$prob)
+      ind1 <- rownames( design$variables ) %in% rownames( dsub1$variables )
     }
     q_alpha1 <- svyiqalpha( formula , dsub1 , quantiles , ... )
 
     ### >= 65 yo income
     dsub2 <- eval( substitute( within_function_subset( design , age >= agelim ) , list( age = age.name, agelim = agelim ) ) )
-    if( nrow( dsub2 ) == 0 ) stop( "zero records in the set of elderly people" )
+    if( sum( 1/dsub2$prob > 0 ) == 0 ) stop( "zero records in the set of elderly people" )
     if( "DBIsvydesign" %in% class( dsub2 ) ) {
-      ind2 <- names(design$prob) %in% which(is.finite(dsub2$prob) )
+      ind2 <- rownames(design$variables) %in% which( is.finite( dsub2$prob ) )
     } else{
-      ind2 <- names(design$prob) %in% names(dsub2$prob)
+      ind2 <- rownames( design$variables ) %in% rownames( dsub2$variables )
     }
 
     # compute quantiles
@@ -167,7 +167,7 @@ svyrmir.survey.design  <-
     list_all<- list(MED1=MED1, MED2=MED2)
 
     # linearize ratio of medians
-    RMED <- contrastinf(quote(MED2/MED1),list_all)
+    RMED <- contrastinf( quote( MED2/MED1 ),list_all )
     lin <- as.numeric( RMED$lin )
     names( lin ) <- rownames( design$variables )
 
@@ -230,8 +230,8 @@ svyrmir.svyrep.design <-
       function(x, w, quantiles, age, agelim) {
         indb <- age < agelim
         inda <-  age >= agelim
-        quant_below <- computeQuantiles(x[indb], w[indb], p = quantiles )
-        quant_above <- computeQuantiles(x[inda], w[inda], p = quantiles )
+        quant_below <- computeQuantiles( x[indb], w[indb], p = quantiles )
+        quant_above <- computeQuantiles( x[inda], w[inda], p = quantiles )
         c(quant_above, quant_below, quant_above/quant_below)
       }
 
@@ -241,6 +241,19 @@ svyrmir.svyrep.design <-
     # compute pont estimates
     Rmir_val <- ComputeRmir( incvar , ws , quantiles, agevar,  agelim )
 
+
+    # treat missing
+    if ( is.na( Rmir_val[[3]] ) ) {
+      rval <- NA
+      variance <-  as.matrix( NA )
+      class(rval) <- c( "cvystat" , "svrepstat" )
+      names( rval ) <- names( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+      attr( rval , "var" ) <- variance
+      attr( rval , "statistic" ) <- "rmir"
+      if (med_old) attr( rval, "med_old") <- Rmir_val[1]
+      if (med_young) attr( rval, "med_young") <- Rmir_val[2]
+      return( rval )
+    }
     # collect analysis weights
     ww <- weights(design, "analysis")
 

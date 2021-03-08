@@ -140,6 +140,23 @@ svyrmpg.survey.design <-
 		ARPT <- list(value = arpt, lin = linarpt)
 		list_all<- list(ARPT=ARPT, MEDP=MEDP)
 
+		# treat missing
+		if ( anyNA( sapply( list( ARPT , POORMED ), coef ) ) ) {
+
+		  # build result object
+		  rval <- NA
+		  variance <- as.matrix( NA )
+		  names( rval ) <- rownames( variance ) <- colnames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+		  class(rval) <- c( "cvystat" , "svystat" )
+		  attr( rval , "var" ) <- variance
+		  # attr(rval, "influence") <- NA
+		  attr( rval , "statistic" ) <- "rmpg"
+		  if(thresh) attr(rval, "thresh") <- arpt
+		  if(poor_median) attr(rval, "poor_median") <- medp
+		  return( rval )
+
+		}
+
 		# linearize RMPG
 		RMPG <- contrastinf( quote( 1 - MEDP / ARPT ) , list_all )
 		infun <- as.numeric(RMPG$lin)
