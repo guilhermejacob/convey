@@ -6,6 +6,7 @@
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
 #' @param epsilon a parameter that determines the sensivity towards inequality in the top of the distribution. Defaults to epsilon = 1.
 #' @param na.rm Should cases with missing values be dropped?
+#' @param deff Return the design effect (see \code{survey::svymean}).
 #' @param ... future expansion
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -132,7 +133,7 @@ svygei <-
 #' @rdname svygei
 #' @export
 svygei.survey.design <-
-  function ( formula, design, epsilon = 1, na.rm = FALSE, ... ) {
+  function ( formula, design, epsilon = 1, na.rm = FALSE, deff= FALSE , ... ) {
 
     # collect income data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -168,6 +169,15 @@ svygei.survey.design <-
     variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+    # compute deff
+    if ( is.character(deff) || deff) {
+      nobs <- sum( weights( design ) != 0 )
+      npop <- sum( weights( design ) )
+      if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
+      else vsrs <- svyvar( lin , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+      deff.estimate <- variance/vsrs
+    }
+
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
 
@@ -179,6 +189,7 @@ svygei.survey.design <-
     attr(rval, "statistic") <- "gei"
     attr(rval,"epsilon")<- epsilon
     attr(rval,"influence") <- lin
+    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
   }
@@ -187,7 +198,7 @@ svygei.survey.design <-
 #' @rdname svygei
 #' @export
 svygei.svyrep.design <-
-  function(formula, design, epsilon = 1,na.rm=FALSE, ...) {
+  function(formula, design, epsilon = 1,na.rm=FALSE, deff= FALSE ,...) {
 
     # collect income variable
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -224,6 +235,24 @@ svygei.svyrep.design <-
     }
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+    # compute deff
+    if ( is.character(deff) || deff ) {
+
+      # compute influence function
+      lin <- CalcGEI_IF( incvar , ws , epsilon )
+
+      # compute deff
+      nobs <- length( design$pweights )
+      npop <- sum( design$pweights )
+      vsrs <- unclass( svyvar( lin , design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+      if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+      deff.estimate <- variance / vsrs
+
+      # filter observation
+      names( lin ) <- rownames( design$variables )
+
+    }
+
     # build result object
     rval <- estimate
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -231,6 +260,8 @@ svygei.svyrep.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gei"
     attr(rval,"epsilon") <- epsilon
+    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
+    if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
     rval
 
   }

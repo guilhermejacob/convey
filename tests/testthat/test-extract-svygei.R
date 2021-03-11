@@ -44,17 +44,17 @@ des_eusilc <- subset( des_eusilc , eqincome > 0 )
 des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
 # calculate estimates
-a1 <- svygei( ~eqincome , des_eusilc , epsilon = .5 )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygei , epsilon =.5 )
-b1 <- svygei( ~eqincome , des_eusilc_rep , epsilon = .5 )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygei , epsilon = .5 )
+a1 <- svygei( ~eqincome , des_eusilc , epsilon = .5 , deff = TRUE )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygei , epsilon =.5 , deff = TRUE )
+b1 <- svygei( ~eqincome , des_eusilc_rep , epsilon = .5 , deff = TRUE )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygei , epsilon = .5 , deff = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
 se_diff2 <- max( abs( SE( a2 ) - SE( b2 ) ) , na.rm = TRUE )
 
 # perform tests
-test_that( "output svygei" , {
+test_that( "output svyjdiv" , {
   expect_is( coef( a1 ) ,"numeric" )
   expect_is( coef( a2 ) , "numeric" )
   expect_is( coef( b1 ) ,"numeric" )
@@ -75,6 +75,7 @@ test_that( "output svygei" , {
   expect_equal( sum( confint( a2 )[,2] >= coef( a2 ) ) , length( coef( a2 ) ) )
   expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
+  expect_equal( attr( a1 , "influence" ) , attr( b1 , "influence" ) )
 } )
 
 ### test 2: income data from eusilc --- database-backed design object
@@ -112,8 +113,8 @@ test_that("database svygei",{
   dbd_eusilc <- subset( dbd_eusilc , eqincome > 0 )
 
   # calculate estimates
-  c1 <- svygei( ~ eqincome , dbd_eusilc , epsilon = .5 )
-  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svygei , epsilon = .5 )
+  c1 <- svygei( ~ eqincome , dbd_eusilc , epsilon = .5 , deff = TRUE )
+  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svygei , epsilon = .5 , deff = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -124,19 +125,22 @@ test_that("database svygei",{
   expect_equal( coef( a2 ) , coef( c2 ) )
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 ) )
+  expect_equal( deff( a1 ) , deff( c1 ) )
+  expect_equal( deff( a2 ) , deff( c2 ) )
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+  expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" ) )
 
 } )
 
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = .5 )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = .5 )
-sub_rep <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = .5 )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = .5 )
+sub_des <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = .5 , deff = TRUE )
+sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = .5 , deff = TRUE )
+sub_rep <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = .5 , deff = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = .5 , deff = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -149,6 +153,10 @@ test_that("subsets equal svyby",{
   expect_equal( as.numeric( SE( sub_des ) ) , as.numeric( SE( sby_des ) )[1] )
   expect_equal( as.numeric( SE( sub_rep ) ) , as.numeric( SE( sby_rep ) )[1] )
 
+  # domain vs svyby: DEffs must be equal
+  expect_equal( as.numeric( deff( sub_des ) ) , as.numeric( deff( sby_des ) )[1] )
+  expect_equal( as.numeric( deff( sub_rep ) ) , as.numeric( deff( sby_rep ) )[1] )
+
   # domain vs svyby and svydesign vs svyrepdesign:
   # coefficients should match across svydesign
   expect_equal( as.numeric( coef( sub_des ) ) , as.numeric( coef( sby_rep ) )[1] )
@@ -157,6 +165,9 @@ test_that("subsets equal svyby",{
   # coefficients of variation should be within five percent
   cv_diff <- abs( cv( sub_des ) - cv( sby_rep )[1] )
   expect_lte( cv_diff , .5 )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_rep , "influence" ) )
 
 } )
 
@@ -211,10 +222,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- subset( dbd_eusilc_rep , eqincome > 0 )
 
   # calculate estimates
-  sub_dbd <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = .5 )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = .5 )
-  sub_dbr <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = .5 )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = .5 )
+  sub_dbd <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = .5 , deff = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = .5 , deff = TRUE )
+  sub_dbr <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = .5 , deff = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = .5 , deff = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -225,6 +236,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( coef( sub_rep ) , coef( sub_dbr ) )
   expect_equal( SE( sub_des ) , SE( sub_dbd ) )
   expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
+  expect_equal( deff( sub_des ) , deff( sub_dbd ) )
+  expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
 
   # compare database-backed subsetted objects to database-backed svyby objects
   # dbi subsets equal dbi svyby
@@ -235,5 +248,6 @@ test_that("dbi subsets equal non-dbi subsets",{
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
+  expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
 
 } )
