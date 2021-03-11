@@ -212,6 +212,7 @@ coef.cvystat <- function(object, ...) {
   attr(object, "extra") <- NULL
   attr(object, "components") <- NULL
   attr(object, "group") <- NULL
+  attr(object, "thresh") <- NULL
   unclass(object)
 }
 
