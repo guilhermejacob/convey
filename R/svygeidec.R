@@ -1,4 +1,4 @@
-#' Generalized entropy index Decomposition
+#' Generalized Entropy Index Decomposition
 #'
 #' Estimates the group decomposition of the generalized entropy index
 #'
@@ -132,7 +132,7 @@ svygeidec.survey.design <-
 
     # collect data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
-    grpvar <- model.frame( subgroup, design$variables, na.action = na.pass)[,]
+    grpvar <- model.frame( subgroup, design$variables, na.action = na.pass , drop.unused.levels = TRUE)[,]
 
     # check types
     if ( class(grpvar) == "labelled" ) {
@@ -144,7 +144,7 @@ svygeidec.survey.design <-
       nas <- ( is.na(incvar) | is.na(grpvar ) )
       design <- design[!nas, ]
       incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
-      grpvar <- model.frame( subgroup, design$variables, na.action = na.pass)[,]
+      grpvar <- model.frame( subgroup, design$variables, na.action = na.pass , drop.unused.levels = TRUE)[,]
     }
 
     # collect sampling weights
@@ -309,7 +309,7 @@ svygeidec.svyrep.design <-
 
     # collect data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
-    grpvar <- model.frame( subgroup, design$variables, na.action = na.pass)[,]
+    grpvar <- model.frame( subgroup, design$variables, na.action = na.pass , drop.unused.levels = TRUE)[,]
 
     # check types
     if ( class(grpvar) == "labelled" ) {
@@ -321,8 +321,8 @@ svygeidec.svyrep.design <-
       nas<-is.na(incvar) | is.na(grpvar)
       design<-design[!nas,]
       df <- model.frame(design)
-      incvar <- incvar[!nas]
-      grpvar <- grpvar[!nas]
+      incvar <- model.frame(formula, design$variables, na.action = na.pass)[,]
+      grpvar <- model.frame( subgroup, design$variables, na.action = na.pass , drop.unused.levels = TRUE)[,]
     }
 
     # collect samling weights

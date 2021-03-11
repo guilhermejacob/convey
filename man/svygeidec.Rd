@@ -5,7 +5,7 @@
 \alias{svygeidec.survey.design}
 \alias{svygeidec.svyrep.design}
 \alias{svygeidec.DBIsvydesign}
-\title{Generalized entropy index Decomposition}
+\title{Generalized Entropy Index Decomposition}
 \usage{
 svygeidec(formula, subgroup, design, ...)
 

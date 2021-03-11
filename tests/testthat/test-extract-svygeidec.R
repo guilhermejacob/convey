@@ -39,7 +39,7 @@ cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ))
 se_diff2 <- max( abs( SE( a2 ) - SE( b2 ) ) , na.rm = TRUE )
 
 # perform tests
-test_that( "output svygei" , {
+test_that( "output svygeidec" , {
   expect_is( coef( a1 ) ,"numeric" )
   expect_is( coef( a2 ) , "numeric" )
   expect_is( coef( b1 ) ,"numeric" )
