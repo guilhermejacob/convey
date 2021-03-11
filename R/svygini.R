@@ -5,6 +5,7 @@
 #' @param formula a formula specifying the income variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
 #' @param na.rm Should cases with missing values be dropped?
+#' @param deff Return the design effect (see \code{survey::svymean}).
 #' @param ... future expansion
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -93,7 +94,7 @@ svygini <-
 #' @rdname svygini
 #' @export
 svygini.survey.design <-
-  function(formula, design, na.rm=FALSE, ...) {
+  function(formula, design, na.rm=FALSE, deff=FALSE , ...) {
 
     # collect income data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -126,6 +127,15 @@ svygini.survey.design <-
     variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+    # compute deff
+    if ( is.character(deff) || deff) {
+      nobs <- sum( weights( design ) != 0 )
+      npop <- sum( weights( design ) )
+      if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
+      else vsrs <- svyvar( lin , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+      deff.estimate <- variance/vsrs
+    }
+
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
 
@@ -136,6 +146,7 @@ svygini.survey.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gini"
     attr(rval,"influence") <- lin
+    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
   }
@@ -143,7 +154,7 @@ svygini.survey.design <-
 #' @rdname svygini
 #' @export
 svygini.svyrep.design <-
-  function(formula, design,na.rm=FALSE, ...) {
+  function(formula, design, na.rm=FALSE , deff=FALSE , ...) {
 
     # collect data
     df <- model.frame(design)
@@ -178,12 +189,32 @@ svygini.svyrep.design <-
     }
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+    # compute deff
+    if ( is.character(deff) || deff ) {
+
+      # compute influence function
+      lin <- CalcGini_IF( incvar , ws )
+
+      # compute deff
+      nobs <- length( design$pweights )
+      npop <- sum( design$pweights )
+      vsrs <- unclass( svyvar( lin , design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+      if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+      deff.estimate <- variance / vsrs
+
+      # filter observation
+      names( lin ) <- rownames( design$variables )
+
+    }
+
     # build result object
     rval <- estimate
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gini"
+    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
+    if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
     rval
 
   }
