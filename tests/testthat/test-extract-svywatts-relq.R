@@ -18,8 +18,8 @@ expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
 
 # perform tests
 test_that( "svywatts works on unweighted designs" , {
-  expect_false( is.na ( coef( svywatts( ~api00, design=dstrat1 , type_thresh = "relq" ) ) ) )
-  expect_false( is.na ( SE( svywatts( ~api00, design=dstrat1 , type_thresh = "relq" ) ) ) )
+  expect_false( is.na ( coef( svywatts( ~api00, design=dstrat1 , type_thresh = "relq" , deff = TRUE ) ) ) )
+  expect_false( is.na ( SE( svywatts( ~api00, design=dstrat1 , type_thresh = "relq" , deff = TRUE ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- data.frame-backed design object
@@ -41,10 +41,10 @@ des_eusilc <- subset( des_eusilc , eqincome > 0 )
 des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
 # calculate estimates
-a1 <- svywatts( ~eqincome , des_eusilc , type_thresh = "relq" )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svywatts , type_thresh = "relq" )
-b1 <- svywatts( ~eqincome , des_eusilc_rep , type_thresh = "relq" )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svywatts , type_thresh = "relq" )
+a1 <- svywatts( ~eqincome , des_eusilc , type_thresh = "relq" , deff = TRUE )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svywatts , type_thresh = "relq" , deff = TRUE )
+b1 <- svywatts( ~eqincome , des_eusilc_rep , type_thresh = "relq" , deff = TRUE )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svywatts , type_thresh = "relq" , deff = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -72,6 +72,7 @@ test_that( "output svywatts" , {
   expect_equal( sum( confint( a2 )[,2] >= coef( a2 ) ) , length( coef( a2 ) ) )
   expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
+  expect_equal( attr( a1 , "influence" ) , attr( b1 , "influence" ) )
 } )
 
 ### test 2: income data from eusilc --- database-backed design object
@@ -109,8 +110,8 @@ test_that("database svywatts",{
   dbd_eusilc <- subset( dbd_eusilc , eqincome > 0 )
 
   # calculate estimates
-  c1 <- svywatts( ~eqincome , dbd_eusilc , type_thresh = "relq" )
-  c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svywatts , type_thresh = "relq" )
+  c1 <- svywatts( ~eqincome , dbd_eusilc , type_thresh = "relq" , deff = TRUE )
+  c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svywatts , type_thresh = "relq" , deff = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -130,10 +131,10 @@ test_that("database svywatts",{
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svywatts( ~eqincome , design = subset( des_eusilc , hsize == 1) , type_thresh = "relq" )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svywatts , type_thresh = "relq" )
-sub_rep <- svywatts( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , type_thresh = "relq" )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svywatts , type_thresh = "relq" )
+sub_des <- svywatts( ~eqincome , design = subset( des_eusilc , hsize == 1) , type_thresh = "relq" , deff = TRUE )
+sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svywatts , type_thresh = "relq" , deff = TRUE )
+sub_rep <- svywatts( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , type_thresh = "relq" , deff = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svywatts , type_thresh = "relq" , deff = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -146,6 +147,10 @@ test_that("subsets equal svyby",{
   expect_equal( as.numeric( SE( sub_des ) ) , as.numeric( SE( sby_des ) )[1] )
   expect_equal( as.numeric( SE( sub_rep ) ) , as.numeric( SE( sby_rep ) )[1] )
 
+  # domain vs svyby: DEffs must be equal
+  expect_equal( as.numeric( deff( sub_des ) ) , as.numeric( deff( sby_des ) )[1] )
+  expect_equal( as.numeric( deff( sub_rep ) ) , as.numeric( deff( sby_rep ) )[1] )
+
   # domain vs svyby and svydesign vs svyrepdesign:
   # coefficients should match across svydesign
   expect_equal( as.numeric( coef( sub_des ) ) , as.numeric( coef( sby_rep ) )[1] )
@@ -154,6 +159,9 @@ test_that("subsets equal svyby",{
   # coefficients of variation should be within five percent
   cv_diff <- abs( cv( sub_des ) - cv( sby_rep )[1] )
   expect_lte( cv_diff , .5 )
+
+  # compare influence functions across data.frame and dbi backed survey design objects
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_rep , "influence" ) )
 
 } )
 
@@ -209,10 +217,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- subset( dbd_eusilc_rep , eqincome > 0 )
 
   # calculate estimates
-  sub_dbd <- svywatts( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , type_thresh = "relq" )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svywatts , type_thresh = "relq" )
-  sub_dbr <- svywatts( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , type_thresh = "relq" )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svywatts , type_thresh = "relq" )
+  sub_dbd <- svywatts( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , type_thresh = "relq" , deff = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svywatts , type_thresh = "relq" , deff = TRUE )
+  sub_dbr <- svywatts( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , type_thresh = "relq" , deff = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svywatts , type_thresh = "relq" , deff = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -223,6 +231,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( coef( sub_rep ) , coef( sub_dbr ) )
   expect_equal( SE( sub_des ) , SE( sub_dbd ) )
   expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
+  expect_equal( deff( sub_des ) , deff( sub_dbd ) )
+  expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
 
   # compare database-backed subsetted objects to database-backed svyby objects
   # dbi subsets equal dbi svyby
@@ -230,9 +240,12 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
   expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+  expect_equal( as.numeric( deff( sub_dbd ) ) , as.numeric( deff( sby_dbd ) )[1] )
+  expect_equal( as.numeric( deff( sub_dbr ) ) , as.numeric( deff( sby_dbr ) )[1] )
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
+  expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
 
 } )
 

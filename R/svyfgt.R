@@ -205,6 +205,7 @@ svyfgt.survey.design <-
       th <- abs_thresh
       arptlin <- rep( 0 , sum( wf > 0 ) )
     }
+    names( arptlin ) <- rownames( full_design$variables )[ wf > 0 ]
 
     ### domain poverty measure estimate
 
