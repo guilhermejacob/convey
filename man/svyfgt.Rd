@@ -161,6 +161,13 @@ dbDisconnect( conn , shutdown = TRUE )
 James Foster, Joel Greer and Erik Thorbecke (1984). A class of decomposable poverty measures.
 \emph{Econometrica}, Vol.52, No.3, pp. 761-766.
 
+Y.G. Berger and C. J. Skinner (2003), Variance estimation for a low income proportion.
+\emph{Journal of the Royal Statistical Society: Series C (Applied Statistics)}, Vol. 52, No. 4, pp. 457-468.
+URL \url{https://doi.org/10.1111/1467-9876.00417}
+
+Buhong Zheng (2001). Statistical inference for poverty measures with relative poverty lines.
+\emph{Journal of Econometrics}, Vol. 101, pp. 337-356.
+
 Guillaume Osier (2009). Variance estimation for complex indicators
 of poverty and inequality. \emph{Journal of the European Survey Research
 Association}, Vol.3, No.3, pp. 167-195,
