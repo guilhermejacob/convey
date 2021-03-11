@@ -50,12 +50,11 @@ svyrich(formula, design, ...)
 
 \item{g}{Richness preference parameter.}
 
-\item{type_thresh}{type of richness threshold. If "abs" the threshold is fixed and given the value
-of abs_thresh; if "relq" it is given by \code{percent} times the quantile; if "relm" it is \code{percent} times the mean.}
+\item{type_thresh}{type of richness threshold. If "abs" the threshold is fixed and given the value of abs_thresh; if "relq" it is given by \code{percent} times the quantile; if "relm" it is \code{percent} times the mean.}
 
 \item{abs_thresh}{richness threshold value if type_thresh is "abs"}
 
-\item{percent}{the multiple of the quantile or mean used in the richness threshold definition. Defaults to \code{percent = 1.5}; i.e., 150% the quantile or mean.}
+\item{percent}{the multiple of the quantile or mean used in the richness threshold definition. Defaults to \code{percent = 1.5}; i.e., 1.5 times the quantile or mean.}
 
 \item{quantiles}{the quantile used used in the richness threshold definition. Defaults to \code{quantiles = .5}, the median.}
 
@@ -166,9 +165,8 @@ Vol. 46, No. 14, pp. 1599-1608, URL \url{http://dx.doi.org/10.1080/00036846.2014
 Andreas Peichl, Thilo Schaefer, and Christoph Scheicher (2010). Measuring richness and poverty: A micro data
 application to Europe and Germany. \emph{Review of Income and Wealth}, Vol. 56, No.3, pp. 597-619.
 
-Guillaume Osier (2009). Variance estimation for complex indicators
-of poverty and inequality. \emph{Journal of the European Survey Research
-Association}, Vol.3, No.3, pp. 167-195,
+Guillaume Osier (2009). Variance estimation for complex indicators of poverty and inequality.
+\emph{Journal of the European Survey Research Association}, Vol.3, No.3, pp. 167-195,
 ISSN 1864-3361, URL \url{http://ojs.ub.uni-konstanz.de/srm/article/view/369}.
 }
 \seealso{

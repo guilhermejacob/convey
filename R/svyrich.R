@@ -5,16 +5,14 @@
 #' @param formula a formula specifying the income variable
 #' @param design a design object of class \code{survey.design} or class \code{svyrep.design} from the \code{survey} library.
 #' @param type_measure A string "Cha", "FGTT1" or "FGTT2" defining the richness measure.
-#' @param type_thresh type of richness threshold. If "abs" the threshold is fixed and given the value
-#' of abs_thresh; if "relq" it is given by \code{percent} times the quantile; if "relm" it is \code{percent} times the mean.
+#' @param type_thresh type of richness threshold. If "abs" the threshold is fixed and given the value of abs_thresh; if "relq" it is given by \code{percent} times the quantile; if "relm" it is \code{percent} times the mean.
 #' @param abs_thresh richness threshold value if type_thresh is "abs"
 #' @param g Richness preference parameter.
-#' @param percent the multiple of the quantile or mean used in the richness threshold definition. Defaults to \code{percent = 1.5}; i.e., 150% the quantile or mean.
+#' @param percent the multiple of the quantile or mean used in the richness threshold definition. Defaults to \code{percent = 1.5}; i.e., 1.5 times the quantile or mean.
 #' @param quantiles the quantile used used in the richness threshold definition. Defaults to \code{quantiles = .5}, the median.
 #' @param thresh return the richness threshold value
 #' @param na.rm Should cases with missing values be dropped?
 #' @param ... passed to \code{svyarpt}
-#'
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
 #'
@@ -32,9 +30,8 @@
 #' Andreas Peichl, Thilo Schaefer, and Christoph Scheicher (2010). Measuring richness and poverty: A micro data
 #' application to Europe and Germany. \emph{Review of Income and Wealth}, Vol. 56, No.3, pp. 597-619.
 #'
-#' Guillaume Osier (2009). Variance estimation for complex indicators
-#' of poverty and inequality. \emph{Journal of the European Survey Research
-#' Association}, Vol.3, No.3, pp. 167-195,
+#' Guillaume Osier (2009). Variance estimation for complex indicators of poverty and inequality.
+#' \emph{Journal of the European Survey Research Association}, Vol.3, No.3, pp. 167-195,
 #' ISSN 1864-3361, URL \url{http://ojs.ub.uni-konstanz.de/srm/article/view/369}.
 #'
 #' @keywords survey
