@@ -56,7 +56,7 @@ densfun <- function(formula, design, x, h = NULL, FUN = "F" , na.rm=FALSE, ...) 
       incvar <- incvar[!nas]
     else incvar[nas] <- 0
   }
-  w <- 1/design$prob
+  w <- weights(design , "sampling")
   N <- sum(w)
   if(is.null(h)) h <- h_fun(incvar,w)
   u <- (x - incvar)/h

@@ -12,6 +12,7 @@
 #' @param quantiles the quantile used used in the poverty threshold definition
 #' @param thresh return the poverty threshold value
 #' @param na.rm Should cases with missing values be dropped?
+#' @param deff Return the design effect (see \code{survey::svymean}).
 #' @param ... passed to \code{svyarpr} and \code{svyarpt}
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -133,7 +134,7 @@
 #'
 #' @export
 svyfgt <-
-  function(formula, design,  ...) {
+  function(formula, design, ... ) {
 
     if( !( 'g' %in% names(list(...)) ) ) stop( "g= parameter must be specified" )
 
@@ -150,7 +151,7 @@ svyfgt <-
 #' @rdname svyfgt
 #' @export
 svyfgt.survey.design <-
-  function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, ...){
+  function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, deff = FALSE , ...){
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -162,7 +163,7 @@ svyfgt.survey.design <-
     # already the full design.  otherwise, pull the full_design from that attribute.
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
 
-    #  survey design h function
+    # h function
     h <- function( y , thresh , g ) ( ( ( thresh - y ) / thresh )^g ) * ( y <= thresh )
 
     # ht function
@@ -192,21 +193,17 @@ svyfgt.survey.design <-
 
     } else if( type_thresh == 'relm') {
 
-      # ARPT <- svymean( formula, full_design , influence = TRUE ,  na.rm=na.rm )
-      # th <- percent * coef( ARPT )[[1]]
-      # arptlin <- (wf > 0) * ( percent * incvec - th ) / sum( wf )
-      # names( arptlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
-
       Yf <- sum( wf * incvec )
       Nf <- sum( wf )
       muf <- Yf/Nf
       th <- percent * muf
-      arptlin <- ( wf > 0 ) * percent * ( incvec - muf ) / Nf
+      arptlin <- percent * ( incvec - muf ) / Nf
+      arptlin <- arptlin[ wf > 0 ]
       names( arptlin ) <- rownames( full_design$variables )[ wf > 0 ]
 
     } else if ( type_thresh == 'abs' ) {
       th <- abs_thresh
-      arptlin <- rep( 0 , length( wf ) )
+      arptlin <- rep( 0 , sum( wf > 0 ) )
     }
 
     ### domain poverty measure estimate
@@ -225,37 +222,45 @@ svyfgt.survey.design <-
     w <- 1/design$prob
 
     # domain population size
-    N <- sum( w )
+    Nd <- sum( w )
 
     # compute value
-    estimate <- sum( w * h( incvar , th , g ) ) / N
+    estimate <- sum( w * h( incvar , th , g ) ) / Nd
 
     ### linearization
 
-    # compute linearized variable under fixed threshold
-    fgtlin <- ( w > 0 ) * ( h( incvar , th , g ) - estimate ) / N
+    # add linearized threshold
+    ID <- 1 *( rownames( full_design$variables ) %in% rownames( design$variables )[1/design$prob > 0 ] )
+    fgtlin1 <- ID * ( h( incvec , th , g ) - estimate ) / Nd
+    fgtlin1 <- fgtlin1[ wf > 0 ]
+    Fprime <- densfun( formula , design = design , th , h = NULL , FUN = "F", na.rm = na.rm )
+    ahat <- sum( w * ht( incvar , th , g ) ) / Nd
+    ahF <- ahat + h( th , th , g ) * Fprime
+    if ( type_thresh %in% c( "relq" , "relm" ) ) fgtlin2 <- ahF * arptlin else fgtlin2 <- 0
+    fgtlin <- fgtlin1 + fgtlin2
+    names( fgtlin ) <- rownames( full_design$variables )[ wf > 0 ]
 
     # ensure length
     if ( length( fgtlin ) != length( full_design$prob ) ) {
-      names( fgtlin ) <- rownames( design$variables )[ w > 0 ]
+      names( fgtlin ) <- rownames( full_design$variables )[ wf > 0 ]
       fgtlin <- fgtlin[ pmatch( rownames( full_design$variables ) , names( fgtlin ) ) ]
       names( fgtlin ) <- rownames( full_design$variables )
       fgtlin[ is.na( fgtlin ) ] <- 0
     }
 
-    # add linearized threshold
-    ID <- 1 *( rownames( full_design$variables ) %in% rownames( design$variables )[1/design$prob > 0 ] )
-    fgtlin1 <- ( h( incvec , th , g ) - estimate ) / N
-    Fprime <- densfun( formula , design = design , th , h = NULL , FUN = "F", na.rm = na.rm )
-    ahat <- sum( w * ht( incvar , th , g ) ) / N
-    ahF <- ahat + h( th , th , g ) * Fprime
-    if ( type_thresh %in% c( "relq" , "relm" ) ) fgtlin2 <- ahF * arptlin else fgtlin2 <- 0
-    fgtlin <- ID * fgtlin1 + fgtlin2
-
     # compute variance
     variance <- survey::svyrecvar( fgtlin/full_design$prob, full_design$cluster, full_design$strata, full_design$fpc, postStrata = full_design$postStrata )
     variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+    # compute deff
+    if ( is.character(deff) || deff) {
+      nobs <- sum( weights( full_design ) != 0 )
+      npop <- sum( weights( full_design ) )
+      if (deff == "replace") vsrs <- svyvar( fgtlin , full_design, na.rm = na.rm) * npop^2/nobs
+      else vsrs <- svyvar( fgtlin , full_design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+      deff.estimate <- variance/vsrs
+    }
 
     # keep necessary influence functions
     fgtlin <- fgtlin[ 1/full_design$prob > 0 ]
@@ -268,6 +273,7 @@ svyfgt.survey.design <-
     attr(rval, "statistic") <- paste0("fgt",g)
     attr(rval, "influence") <- fgtlin
     if(thresh) attr(rval, "thresh") <- th
+    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
   }
@@ -277,7 +283,7 @@ svyfgt.survey.design <-
 #' @rdname svyfgt
 #' @export
 svyfgt.svyrep.design <-
-  function(formula, design, g, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE,...) {
+  function(formula, design, g, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, deff=FALSE , ...) {
 
     # checked for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -289,8 +295,11 @@ svyfgt.svyrep.design <-
     # already the full design.  otherwise, pull the full_design from that attribute.
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
 
-    # svyrep design h function
-    h <- function(y,thresh,g) ( ( ( thresh - y ) / thresh )^g ) * ( y <= thresh )
+    # h function
+    h <- function( y , thresh , g ) ( ( ( thresh - y ) / thresh )^g ) * ( y <= thresh )
+
+    # ht function
+    ht <- function( y , thresh , g ) ( g * ( ( ( thresh - y ) / thresh )^( g - 1 ) ) * ( y / ( thresh^2 ) ) ) * ( y <= thresh )
 
     # svyrep design ComputeFGT function
     ComputeFGT <-
@@ -300,6 +309,30 @@ svyfgt.svyrep.design <-
         N <- sum(w)
         sum( w * h( y , thresh , g ) ) / N
       }
+
+    # collect data from full sample
+    df_full<- model.frame(full_design)
+    incvec <- model.frame(formula, full_design$variables, na.action = na.pass)[[1]]
+
+    # treat missing values
+    if(na.rm){
+      nas<-is.na(incvec)
+      full_design<-full_design[!nas,]
+      df_full <- model.frame(full_design)
+      incvec <- incvec[!nas]
+    }
+
+    # collect weights from full sample
+    wsf <- weights(full_design,"sampling")
+    names(incvec) <- names(wsf) <- row.names(df_full)
+    ind <- row.names(df)
+
+    # poverty threshold
+    if(type_thresh=='relq') th <- percent * computeQuantiles( incvec, wsf, p = quantiles)
+    if(type_thresh=='relm') th <- percent*sum(incvec*wsf)/sum(wsf)
+    if(type_thresh=='abs') th <- abs_thresh
+
+    ### domain poverty measure
 
     # collect domain data
     df <- model.frame(design)
@@ -317,30 +350,10 @@ svyfgt.svyrep.design <-
     ws <- weights(design, "sampling")
     names(ws) <- rownames(design$variables)
 
-    # collect data from full sample
-    df_full<- model.frame(full_design)
-    incvec <- model.frame(formula, full_design$variables, na.action = na.pass)[[1]]
-
-    # treat missing values
-    if(na.rm){
-      nas<-is.na(incvec)
-      full_design<-full_design[!nas,]
-      df_full <- model.frame(full_design)
-      incvec <- incvec[!nas]
-    }
-
-    # collect weights from full sample
-    wsf <- weights(full_design,"sampling")
-    names(incvec) <- names(wsf) <- row.names(df_full)
-    ind<- row.names(df)
-
-    # poverty threshold
-    if(type_thresh=='relq') th <- percent * computeQuantiles( incvec, wsf, p = quantiles)
-    if(type_thresh=='relm') th <- percent*sum(incvec*wsf)/sum(wsf)
-    if(type_thresh=='abs') th <- abs_thresh
-
     # compute point estimate
     rval <- ComputeFGT(incvar, ws, g = g, th)
+
+    ### variance calculation
 
     # collect full sample analysis weights
     wwf <- weights(full_design, "analysis")
@@ -349,7 +362,6 @@ svyfgt.svyrep.design <-
     qq <- apply( wwf, 2, function(wi) {
 
       names( wi ) <- row.names( df_full )
-
       if(type_thresh=='relq') thr <- percent * computeQuantiles( incvec , wi , p = quantiles )
       if(type_thresh=='relm') thr <- percent*sum( incvec*wi )/sum( wi )
       if(type_thresh=='abs')  thr <- abs_thresh
@@ -373,12 +385,59 @@ svyfgt.svyrep.design <-
     # calculate variance
     variance <- survey::svrVar( qq, full_design$scale , full_design$rscales, mse = full_design$mse, coef = rval )
 
+    # compute deff
+    if ( is.character(deff) || deff ) {
+
+
+      # compute threshold influence function on full sample
+      # branch on threshold type and its influence function
+      if( type_thresh == 'relq' ) arptlin <- percent * CalcQuantile_IF( incvec , wsf , quantiles )
+      if( type_thresh == 'relm') {
+        Yf <- sum( wsf * incvec )
+        Nf <- sum( wsf )
+        muf <- Yf/Nf
+        arptlin <- percent * ( incvec - muf ) / Nf
+        arptlin <- arptlin[ wsf > 0 ]
+      }
+      if ( type_thresh == 'abs' ) {
+        arptlin <- rep( 0 , sum( wsf > 0 ) )
+      }
+      names( arptlin ) <- rownames( full_design$variables )[ wsf > 0 ]
+
+      # compute poverty measure influence function
+      # under fixed poverty threshold
+      Nd <- sum( ws )
+      ID <- 1 *( rownames( full_design$variables ) %in% rownames( design$variables )[ ws > 0 ] )
+      fgtlin1 <- ID * ( h( incvec , th , g ) - rval ) / Nd
+      fgtlin1 <- fgtlin1[ wsf > 0]
+
+      # combine both linearization
+      Fprime <- densfun( formula , design = design , th , h = NULL , FUN = "F", na.rm = na.rm )
+      ahat <- sum( ws * ht( incvar , th , g ) ) / Nd
+      ahF <- ahat + h( th , th , g ) * Fprime
+      if ( type_thresh %in% c( "relq" , "relm" ) ) fgtlin2 <- ahF * arptlin else fgtlin2 <- 0
+      fgtlin <- fgtlin1 + fgtlin2
+
+      # compute deff
+      nobs <- length( full_design$pweights )
+      npop <- sum( full_design$pweights )
+      vsrs <- unclass( svyvar( fgtlin , full_design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+      if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+      deff.estimate <- variance / vsrs
+
+      # add indices
+      names( fgtlin ) <- rownames( full_design$variables )[ wsf > 0 ]
+
+    }
+
     # setup result object
     names( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt",g)
     if(thresh) attr(rval, "thresh") <- th
+    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
+    if ( is.character(deff) || deff) attr( rval , "influence" ) <- fgtlin
     rval
 
   }
