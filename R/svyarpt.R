@@ -7,6 +7,7 @@
 #' @param quantiles income quantile quantiles, usually .50 (median)
 #' @param percent fraction of the quantile, usually .60
 #' @param na.rm Should cases with missing values be dropped?
+#' @param deff Return the design effect (see \code{survey::svymean}).
 #' @param ... arguments passed on to `survey::svyquantile`
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -95,7 +96,7 @@ svyarpt <-
 #' @rdname svyarpt
 #' @export
 svyarpt.survey.design <-
-	function(formula, design, quantiles = 0.5, percent = 0.6,  na.rm = FALSE,...) {
+	function(formula, design, quantiles = 0.5, percent = 0.6,  na.rm = FALSE, deff=FALSE , ...) {
 
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
 
@@ -135,6 +136,15 @@ svyarpt.survey.design <-
 		variance[ which( is.nan( variance ) ) ] <- NA
 		colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+		# compute deff
+		if ( is.character(deff) || deff) {
+		  nobs <- sum( weights( design ) != 0 )
+		  npop <- sum( weights( design ) )
+		  if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
+		  else vsrs <- svyvar( lin , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+		  deff.estimate <- variance/vsrs
+		}
+
 		# keep necessary influence functions
 		lin <- lin[ 1/design$prob > 0 ]
 
@@ -144,6 +154,7 @@ svyarpt.survey.design <-
 		attr( rval , "var" ) <- variance
 		attr( rval , "statistic" ) <- "arpt"
 		attr( rval , "influence" ) <- lin
+		if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
 		rval
 
 	}
@@ -151,7 +162,7 @@ svyarpt.survey.design <-
 #' @rdname svyarpt
 #' @export
 svyarpt.svyrep.design <-
-	function(formula, design, quantiles = 0.5, percent = 0.6, na.rm = FALSE, ...) {
+	function(formula, design, quantiles = 0.5, percent = 0.6, na.rm = FALSE, deff=FALSE , ...) {
 
 	  # check for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -196,12 +207,32 @@ svyarpt.svyrep.design <-
 		}
 		colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+		# compute deff
+		if ( is.character(deff) || deff ) {
+
+		  # compute influence function
+		  lin <- percent * CalcQuantile_IF( incvar , w , quantiles )
+
+		  # compute deff
+		  nobs <- length( design$pweights )
+		  npop <- sum( design$pweights )
+		  vsrs <- unclass( svyvar( lin , design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+		  if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+		  deff.estimate <- variance / vsrs
+
+		  # filter observation
+		  names( lin ) <- rownames( design$variables )
+
+		}
+
 		# build result object
 		rval <- estimate
 		names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class(rval) <- c( "cvystat" , "svrepstat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "arpt"
+		if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
+		if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
 		rval
 
 	}
