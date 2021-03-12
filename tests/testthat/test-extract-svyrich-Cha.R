@@ -21,8 +21,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
 
   # perform tests
   test_that( paste0( "svyrich g=", this.g , " works on unweighted designs"), {
-    expect_false( is.na ( coef( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "Cha" ) ) ) )
-    expect_false( is.na ( SE( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "Cha" ) ) ) )
+    expect_false( is.na ( coef( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE ) ) ) )
+    expect_false( is.na ( SE( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE ) ) ) )
   } )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
@@ -40,10 +40,10 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
   des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
   # calculate estimates
-  a1 <- svyrich( ~eqincome , des_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-  b1 <- svyrich( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
+  a1 <- svyrich( ~eqincome , des_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+  b1 <- svyrich( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -71,6 +71,7 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     expect_equal( sum( confint( a2 )[,2] >= coef( a2 ) ) , length( coef( a2 ) ) )
     expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
     expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
+    expect_equal( attr( a1 , "influence" ) , attr( b1 , "influence" ) )
   } )
 
   ### test 2: income data from eusilc --- database-backed design object
@@ -105,8 +106,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     dbd_eusilc <- convey_prep( dbd_eusilc )
 
     # calculate estimates
-    c1 <- svyrich( ~eqincome , dbd_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
+    c1 <- svyrich( ~eqincome , dbd_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
 
     # remove table and close connection to database
     dbRemoveTable( conn , 'eusilc' )
@@ -117,6 +118,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     expect_equal( coef( a2 ) , coef( c2 ) )
     expect_equal( SE( a1 ) , SE( c1 ) )
     expect_equal( SE( a2 ) , SE( c2 ) )
+    expect_equal( deff( a1 ) , deff( c1 ) )
+    expect_equal( deff( a2 ) , deff( c2 ) )
 
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
@@ -126,10 +129,10 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
   ### test 3: compare subsetted objects to svyby objects
 
   # calculate estimates
-  sub_des <- svyrich( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-  sub_rep <- svyrich( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
+  sub_des <- svyrich( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+  sub_rep <- svyrich( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
 
   # perform tests
   test_that("subsets equal svyby",{
@@ -142,6 +145,10 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     expect_equal( as.numeric( SE( sub_des ) ) , as.numeric( SE( sby_des ) )[1] )
     expect_equal( as.numeric( SE( sub_rep ) ) , as.numeric( SE( sby_rep ) )[1] )
 
+    # domain vs svyby: DEffs must be equal
+    expect_equal( as.numeric( deff( sub_des ) ) , as.numeric( deff( sby_des ) )[1] )
+    expect_equal( as.numeric( deff( sub_rep ) ) , as.numeric( deff( sby_rep ) )[1] )
+
     # domain vs svyby and svydesign vs svyrepdesign:
     # coefficients should match across svydesign
     expect_equal( as.numeric( coef( sub_des ) ) , as.numeric( coef( sby_rep ) )[1] )
@@ -150,6 +157,9 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     # coefficients of variation should be within five percent
     cv_diff <- abs( cv( sub_des ) - cv( sby_rep )[1] )
     expect_lte( cv_diff , .5 )
+
+    # compare influence functions across data.frame and dbi backed survey design objects
+    expect_equal( attr( sub_des , "influence" ) , attr( sub_rep , "influence" ) )
 
   } )
 
@@ -201,10 +211,10 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
     # calculate estimates
-    sub_dbd <- svyrich( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-    sub_dbr <- svyrich( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
-    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" )
+    sub_dbd <- svyrich( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+    sub_dbr <- svyrich( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
+    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "Cha" , deff = TRUE )
 
     # remove table and disconnect from database
     dbRemoveTable( conn , 'eusilc' )
@@ -215,6 +225,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     expect_equal( coef( sub_rep ) , coef( sub_dbr ) )
     expect_equal( SE( sub_des ) , SE( sub_dbd ) )
     expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
+    expect_equal( deff( sub_des ) , deff( sub_dbd ) )
+    expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
 
     # compare database-backed subsetted objects to database-backed svyby objects
     # dbi subsets equal dbi svyby
@@ -222,9 +234,12 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(.5,2,3) )  
     expect_equal( as.numeric( coef( sub_dbr ) ) , as.numeric( coef( sby_dbr ) )[1] )
     expect_equal( as.numeric( SE( sub_dbd ) ) , as.numeric( SE( sby_dbd ) )[1] )
     expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
+    expect_equal( as.numeric( deff( sub_dbd ) ) , as.numeric( deff( sby_dbd ) )[1] )
+    expect_equal( as.numeric( deff( sub_dbr ) ) , as.numeric( deff( sby_dbr ) )[1] )
 
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
+    expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
 
   } )
 
