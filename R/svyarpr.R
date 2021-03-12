@@ -317,7 +317,7 @@ svyarpr.svyrep.design <-
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "arpr"
-    attr(rval,"influence") <- arprlin
+    if ( is.character(deff) || deff) attr(rval,"influence") <- arprlin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
