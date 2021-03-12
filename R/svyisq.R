@@ -9,6 +9,7 @@
 #' @param upper return the total in the total in the upper tail. Defaults to \code{FALSE}.
 #' @param quantile return the upper bound of the lower tail
 #' @param na.rm Should cases with missing values be dropped?
+#' @param deff Return the design effect (see \code{survey::svymean}).
 #' @param ... arguments passed on to `survey::svyquantile`
 #'
 #' @return Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.
@@ -93,7 +94,7 @@ svyisq <-
 #' @rdname svyisq
 #' @export
 svyisq.survey.design <-
-	function(formula, design, alpha, quantile = FALSE, upper = FALSE , na.rm = FALSE,...) {
+	function(formula, design, alpha, quantile = FALSE, upper = FALSE , na.rm = FALSE, deff = FALSE , ...) {
 
 	  # test for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -140,6 +141,15 @@ svyisq.survey.design <-
 	  variance[ which( is.nan( variance ) ) ] <- NA
 	  colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+	  # compute deff
+	  if ( is.character( deff ) || deff ) {
+	    nobs <- sum( weights( design , "sampling" ) > 0 )
+	    npop <- sum( weights( design , "sampling" ) )
+	    if ( deff == "replace" ) vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
+	    else vsrs <- svyvar( lin , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+	    deff.estimate <- variance/vsrs
+	  }
+
 	  # keep necessary influence functions
 	  lin <- lin[ 1/design$prob > 0 ]
 
@@ -151,6 +161,7 @@ svyisq.survey.design <-
 	  attr(rval, "statistic") <- "isq"
 		if(quantile) attr(rval, "quantile") <- q_alpha
 	  attr(rval,"influence") <- lin
+	  if ( is.character(deff) || deff ) attr(rval,"deff") <- deff.estimate
 	  rval
 
 	}
@@ -158,7 +169,7 @@ svyisq.survey.design <-
 #' @rdname svyisq
 #' @export
 svyisq.svyrep.design <-
-	function(formula, design, alpha,quantile = FALSE, upper = FALSE , na.rm = FALSE,...){
+	function(formula, design, alpha,quantile = FALSE, upper = FALSE , na.rm = FALSE, deff = FALSE ,...){
 
 	  # check for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -181,6 +192,7 @@ svyisq.svyrep.design <-
 	  if (quantile) q_alpha <- survey::svyquantile(x = formula, design = design, quantiles = alpha, method = "constant", na.rm = na.rm,...)
 
 	  # compute point estimate
+	  q_alpha <- computeQuantiles( incvar , ws, alpha )
 	  estimate <- CalcISQ( incvar , ws, alpha )
 	  if (upper) estimate <- sum( ws * incvar ) - estimate
 
@@ -201,13 +213,37 @@ svyisq.svyrep.design <-
 	  }
 	  colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+	  # compute deff
+	  if ( is.character(deff) || deff ) {
+
+	    # compute influence functions
+	    h <- h_fun( incvar, ws )
+	    Fprime0 <- densfun( formula = formula, design = design , q_alpha[[1]] , FUN = "F",     na.rm = na.rm )
+	    Fprime1 <- densfun( formula = formula, design = design , q_alpha[[1]] , FUN = "big_s", na.rm = na.rm )
+	    lin <- CalcISQ_IF( incvar , ws, alpha , Fprime0 , Fprime1 )
+	    if (upper) lin <- incvar[ ws > 0 ] - lin
+
+	    # compute deff
+	    nobs <- length( design$pweights )
+	    npop <- sum( design$pweights )
+	    vsrs <- unclass( svyvar( lin , design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+	    if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+	    deff.estimate <- variance / vsrs
+
+	    # filter observation
+	    names( lin ) <- rownames( design$variables )
+
+	  }
+
 	  # build result object
 	  rval <- estimate
 	  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 	  class(rval) <- c( "cvystat" , "svrepstat" )
 	  attr(rval, "var") <- variance
 	  attr(rval, "statistic") <- "isq"
-	  if(quantile) attr(rval, "quantile") <- survey::svyquantile()
+	  if(quantile) attr(rval, "quantile") <- q_alpha
+	  if ( is.character(deff) || deff ) attr(rval,"deff") <- deff.estimate
+	  if ( is.character(deff) || deff ) attr(rval,"influence") <- lin
 	  rval
 
 	}
@@ -215,38 +251,38 @@ svyisq.svyrep.design <-
 #' @rdname svyisq
 #' @export
 svyisq.DBIsvydesign <-
-	function (formula, design, ...){
+  function (formula, design, ...){
 
-		if (!( "logical" %in% class(attr(design, "full_design"))) ){
+    if (!( "logical" %in% class(attr(design, "full_design"))) ){
 
-			full_design <- attr( design , "full_design" )
+      full_design <- attr( design , "full_design" )
 
-			full_design$variables <-
-				getvars(
-					formula,
-					attr( design , "full_design" )$db$connection,
-					attr( design , "full_design" )$db$tablename,
-					updates = attr( design , "full_design" )$updates,
-					subset = attr( design , "full_design" )$subset
-				)
+      full_design$variables <-
+        getvars(
+          formula,
+          attr( design , "full_design" )$db$connection,
+          attr( design , "full_design" )$db$tablename,
+          updates = attr( design , "full_design" )$updates,
+          subset = attr( design , "full_design" )$subset
+        )
 
-			attr( design , "full_design" ) <- full_design
+      attr( design , "full_design" ) <- full_design
 
-			rm( full_design )
+      rm( full_design )
 
-		}
+    }
 
-		design$variables <-
-			getvars(
-				formula,
-				design$db$connection,
-				design$db$tablename,
-				updates = design$updates,
-				subset = design$subset
-			)
+    design$variables <-
+      getvars(
+        formula,
+        design$db$connection,
+        design$db$tablename,
+        updates = design$updates,
+        subset = design$subset
+      )
 
-		NextMethod("svyisq", design)
-	}
+    NextMethod("svyisq", design)
+  }
 
 
 # function por point estimates
@@ -310,8 +346,8 @@ CalcDensFun <- function( x , pw , q_alpha , h = NULL , FUN = "F" ) {
   if (FUN == "F") {
     res <- sum(vectf * pw)/(N * h)
   } else {
-      v <- pw * x
-      res <- sum(vectf * v)/h
+    v <- pw * x
+    res <- sum(vectf * v)/h
   }
 
   # final estimate
