@@ -7,6 +7,7 @@
 #' @param quantiles income quantile, usually .50 (median)
 #' @param percent fraction of the quantile, usually .60
 #' @param na.rm Should cases with missing values be dropped?
+#' @param deff Return the design effect (see \code{survey::svymean}).
 #' @param ... arguments passed on to `svyarpt`
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -94,7 +95,7 @@ svyarpr <- function(formula, design, ...) {
 #' @rdname svyarpr
 #' @export
 svyarpr.survey.design <-
-  function(formula, design, quantiles = 0.5, percent = 0.6, na.rm=FALSE,...) {
+  function(formula, design, quantiles = 0.5, percent = 0.6, na.rm=FALSE, deff = FALSE , ...) {
 
     # test for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -175,7 +176,6 @@ svyarpr.survey.design <-
     # ensure length of linearization vector
     if ( length( arprlin ) != length( full_design$prob ) ) {
       names( arprlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
-      # names( arprlin ) <- rownames( design$variables )[ 1/design$prob > 0 ]
       arprlin <- arprlin[ pmatch( rownames( full_design$variables ) , names( arprlin ) ) ]
       names( arprlin ) <- rownames( full_design$variables )
       arprlin[ is.na( arprlin ) ] <- 0
@@ -186,6 +186,15 @@ svyarpr.survey.design <-
     variance[ which( is.nan( variance ) ) ] <- NA
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
+    # compute deff
+    if ( is.character(deff) || deff) {
+      nobs <- sum( weights( full_design , "sampling" ) > 0 )
+      npop <- sum( weights( full_design , "sampling" ) )
+      if (deff == "replace") vsrs <- svyvar( arprlin , full_design, na.rm = na.rm) * npop^2/nobs
+      else vsrs <- svyvar( arprlin , full_design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+      deff.estimate <- variance/vsrs
+    }
+
     # keep necessary influence functions
     arprlin <- arprlin[ 1/full_design$prob > 0 ]
 
@@ -195,6 +204,7 @@ svyarpr.survey.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "arpr"
     attr(rval, "influence") <- arprlin
+    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
   }
@@ -204,7 +214,7 @@ svyarpr.survey.design <-
 #' @rdname svyarpr
 #' @export
 svyarpr.svyrep.design <-
-  function(formula, design, quantiles = 0.5, percent = 0.6,na.rm=FALSE, ...) {
+  function(formula, design, quantiles = 0.5, percent = 0.6,na.rm=FALSE, deff =FALSE, ...) {
 
     # test for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -213,68 +223,102 @@ svyarpr.svyrep.design <-
     # already the full design.  otherwise, pull the full_design from that attribute.
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
 
-    # extract values
-    df <- model.frame(design)
-    incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
+    ### calculate threshold
 
-    # treat missing values
-    if( na.rm ){
-      nas <-is.na( incvar )
-      design <-design[ !nas, ]
-      df <- model.frame(design)
-      incvar <- incvar[!nas]
-    }
-
-    # collect sampling weights
-    ws <- weights(design, "sampling")
-
-    # collect full design inforrmation
-    df_full <- model.frame( full_design )
+    # collect full sample incomes
     incvec <- model.frame( formula , full_design$variables , na.action = na.pass )[[1]]
 
     # treat missing values
     if( na.rm ){
       nas <- is.na(incvec)
       full_design <- full_design[!nas,]
-      df_full <- model.frame( full_design )
-      incvec <- incvec[!nas]
+      incvec <- model.frame( formula , full_design$variables , na.action = na.pass )[[1]]
     }
 
-    # collect full sampling weights
+    # collect full sample sampling weights
     wsf <- weights(full_design,"sampling")
 
     # create indices
-    names(incvec) <- names(wsf) <- row.names(df_full)
-    ind <- row.names(df)
+    names( incvec ) <- names( wsf ) <- row.names( full_design$variables )
 
-    # compute function
-    ComputeArpr <-
-      function(xf, wf, ind, quantiles, percent) {
-        thresh <- percent * computeQuantiles(xf, wf, p = quantiles)
-        sum((xf[ind] <= thresh) * wf[ind])/sum(wf[ind])
-      }
+    # compute threshold
+    thresh <- percent * computeQuantiles( incvec , wsf, p = quantiles )
 
-    # estimate arpr
-    rval <- ComputeArpr(xf = incvec, wf=wsf, ind= ind, quantiles = quantiles, percent = percent)
+    ### compute at risk of poverty rate
+
+    # collect domain sample income
+    incvar <- model.frame( formula, design$variables, na.action = na.pass )[[1]]
+
+    # treat missing values
+    if( na.rm ){
+      nas <- is.na( incvar )
+      design <-design[ !nas, ]
+      incvar <- model.frame( formula, design$variables, na.action = na.pass )[[1]]
+    }
+
+    # collect domain sample sampling weights
+    wsd <- weights( design , "sampling" )
+
+    # compute arpr
+    Nd <- sum( wsd )
+    rval <- sum( ( incvar <= thresh ) * wsd )/ Nd
+
+    ### variance calculation
 
     # collect full analysis weights
     wwf <- weights(full_design, "analysis")
 
+    # add domain indices
+    ind <- rownames( full_design$variables ) %in% rownames( design$variables )
+
     # compute replicates
     qq <- apply( wwf, 2, function( wi ) {
-      names( wi ) <- row.names( df_full )
-      ComputeArpr( incvec , wi , ind=ind , quantiles = quantiles , percent = percent )
+      thr <- percent * computeQuantiles( incvec , wi, p = quantiles )
+      sum( ( incvec[ ind ] <= thr ) * wi[ ind ] ) / sum( wi[ ind ] )
     } )
 
-    # calculate variance
-    if(anyNA(qq))variance <- NA else variance <- survey::svrVar( qq , design$scale , design$rscales , mse = design$mse , coef = rval )
-    variance <- as.matrix( variance )
+    # compute variance
+    if ( any( is.na( qq ) ) ) variance <- as.matrix( NA ) else {
+      variance <- survey::svrVar( qq , full_design$scale , full_design$rscales , mse = full_design$mse , coef = rval )
+      this.mean <- attr( variance , "means" )
+      variance <- as.matrix( variance )
+      attr( variance , "means" ) <- this.mean
+    }
+    colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+    # compute deff
+    if ( is.character(deff) || deff ) {
+
+      # compute linearized threshold
+      arptlin <- percent * CalcQuantile_IF( incvec , wsf , quantiles )
+
+      # compute influence function under fixed threshold
+      ID <- 1 * ( rownames( full_design$variables ) %in% rownames( design$variables ) )
+      arprlin1 <- ID * ( ( incvec <= thresh ) - rval ) / Nd
+
+      # combines both
+      Fprime <- densfun( formula , design = design , thresh , h = NULL , FUN = "F", na.rm = na.rm )
+      arprlin <- arprlin1 + arptlin * Fprime
+
+      # compute deff
+      nobs <- length( full_design$pweights )
+      npop <- sum( full_design$pweights )
+      vsrs <- unclass( svyvar( arprlin , full_design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+      if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+      deff.estimate <- variance / vsrs
+
+      # filter observation
+      names( arprlin ) <- rownames( full_design$variables )
+
+    }
 
     # set up result object
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "arpr"
+    attr(rval,"influence") <- arprlin
+    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
   }
