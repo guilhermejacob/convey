@@ -18,8 +18,9 @@ svyrich(formula, design, ...)
   abs_thresh = NULL,
   percent = 1.5,
   quantiles = 0.5,
-  na.rm = FALSE,
   thresh = FALSE,
+  na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -32,8 +33,9 @@ svyrich(formula, design, ...)
   abs_thresh = NULL,
   percent = 1.5,
   quantiles = 0.5,
-  na.rm = FALSE,
   thresh = FALSE,
+  na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -58,9 +60,11 @@ svyrich(formula, design, ...)
 
 \item{quantiles}{the quantile used used in the richness threshold definition. Defaults to \code{quantiles = .5}, the median.}
 
+\item{thresh}{return the richness threshold value}
+
 \item{na.rm}{Should cases with missing values be dropped?}
 
-\item{thresh}{return the richness threshold value}
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

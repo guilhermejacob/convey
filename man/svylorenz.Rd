@@ -20,6 +20,7 @@ svylorenz(formula, design, ...)
   ci = TRUE,
   alpha = 0.05,
   na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -34,6 +35,7 @@ svylorenz(formula, design, ...)
   ci = TRUE,
   alpha = 0.05,
   na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 

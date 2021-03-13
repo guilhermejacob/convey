@@ -9,9 +9,9 @@
 \usage{
 svyjdiv(formula, design, ...)
 
-\method{svyjdiv}{survey.design}(formula, design, na.rm = FALSE, ...)
+\method{svyjdiv}{survey.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
 
-\method{svyjdiv}{svyrep.design}(formula, design, na.rm = FALSE, ...)
+\method{svyjdiv}{svyrep.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
 
 \method{svyjdiv}{DBIsvydesign}(formula, design, ...)
 }
@@ -23,6 +23,8 @@ svyjdiv(formula, design, ...)
 \item{...}{future expansion}
 
 \item{na.rm}{Should cases with missing values be dropped?}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

@@ -9,9 +9,9 @@
 \usage{
 svygini(formula, design, ...)
 
-\method{svygini}{survey.design}(formula, design, na.rm = FALSE, ...)
+\method{svygini}{survey.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
 
-\method{svygini}{svyrep.design}(formula, design, na.rm = FALSE, ...)
+\method{svygini}{svyrep.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
 
 \method{svygini}{DBIsvydesign}(formula, design, ...)
 }
@@ -23,6 +23,8 @@ svygini(formula, design, ...)
 \item{...}{future expansion}
 
 \item{na.rm}{Should cases with missing values be dropped?}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

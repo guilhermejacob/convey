@@ -9,9 +9,9 @@
 \usage{
 svygei(formula, design, ...)
 
-\method{svygei}{survey.design}(formula, design, epsilon = 1, na.rm = FALSE, ...)
+\method{svygei}{survey.design}(formula, design, epsilon = 1, na.rm = FALSE, deff = FALSE, ...)
 
-\method{svygei}{svyrep.design}(formula, design, epsilon = 1, na.rm = FALSE, ...)
+\method{svygei}{svyrep.design}(formula, design, epsilon = 1, na.rm = FALSE, deff = FALSE, ...)
 
 \method{svygei}{DBIsvydesign}(formula, design, ...)
 }
@@ -25,6 +25,8 @@ svygei(formula, design, ...)
 \item{epsilon}{a parameter that determines the sensivity towards inequality in the top of the distribution. Defaults to epsilon = 1.}
 
 \item{na.rm}{Should cases with missing values be dropped?}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

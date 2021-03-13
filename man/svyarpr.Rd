@@ -9,9 +9,25 @@
 \usage{
 svyarpr(formula, design, ...)
 
-\method{svyarpr}{survey.design}(formula, design, quantiles = 0.5, percent = 0.6, na.rm = FALSE, ...)
+\method{svyarpr}{survey.design}(
+  formula,
+  design,
+  quantiles = 0.5,
+  percent = 0.6,
+  na.rm = FALSE,
+  deff = FALSE,
+  ...
+)
 
-\method{svyarpr}{svyrep.design}(formula, design, quantiles = 0.5, percent = 0.6, na.rm = FALSE, ...)
+\method{svyarpr}{svyrep.design}(
+  formula,
+  design,
+  quantiles = 0.5,
+  percent = 0.6,
+  na.rm = FALSE,
+  deff = FALSE,
+  ...
+)
 
 \method{svyarpr}{DBIsvydesign}(formula, design, ...)
 }
@@ -27,6 +43,8 @@ svyarpr(formula, design, ...)
 \item{percent}{fraction of the quantile, usually .60}
 
 \item{na.rm}{Should cases with missing values be dropped?}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

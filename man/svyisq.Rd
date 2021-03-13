@@ -16,6 +16,7 @@ svyisq(formula, design, ...)
   quantile = FALSE,
   upper = FALSE,
   na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -26,6 +27,7 @@ svyisq(formula, design, ...)
   quantile = FALSE,
   upper = FALSE,
   na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -45,6 +47,8 @@ svyisq(formula, design, ...)
 \item{upper}{return the total in the total in the upper tail. Defaults to \code{FALSE}.}
 
 \item{na.rm}{Should cases with missing values be dropped?}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

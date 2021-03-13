@@ -16,8 +16,9 @@ svywatts(formula, design, ...)
   abs_thresh = NULL,
   percent = 0.6,
   quantiles = 0.5,
-  na.rm = FALSE,
   thresh = FALSE,
+  na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -28,8 +29,9 @@ svywatts(formula, design, ...)
   abs_thresh = NULL,
   percent = 0.6,
   quantiles = 0.5,
-  na.rm = FALSE,
   thresh = FALSE,
+  na.rm = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -51,9 +53,11 @@ of abs_thresh; if "relq" it is given by percent times the quantile; if "relm" it
 
 \item{quantiles}{the quantile used used in the poverty threshold definition}
 
+\item{thresh}{return the poverty threshold value}
+
 \item{na.rm}{Should cases with missing values be dropped?}
 
-\item{thresh}{return the poverty threshold value}
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

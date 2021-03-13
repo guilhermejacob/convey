@@ -9,9 +9,9 @@
 \usage{
 svyiqalpha(formula, design, ...)
 
-\method{svyiqalpha}{survey.design}(formula, design, alpha, na.rm = FALSE, ...)
+\method{svyiqalpha}{survey.design}(formula, design, alpha, na.rm = FALSE, deff = FALSE, ...)
 
-\method{svyiqalpha}{svyrep.design}(formula, design, alpha, na.rm = FALSE, ...)
+\method{svyiqalpha}{svyrep.design}(formula, design, alpha, na.rm = FALSE, deff = FALSE, ...)
 
 \method{svyiqalpha}{DBIsvydesign}(formula, design, ...)
 }
@@ -25,6 +25,8 @@ svyiqalpha(formula, design, ...)
 \item{alpha}{the order of the quantile}
 
 \item{na.rm}{Should cases with missing values be dropped?}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

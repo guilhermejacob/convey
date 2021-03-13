@@ -19,6 +19,7 @@ svyqsr(formula, design, ...)
   lower_quant = FALSE,
   upper_tot = FALSE,
   lower_tot = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -32,6 +33,7 @@ svyqsr(formula, design, ...)
   lower_quant = FALSE,
   upper_tot = FALSE,
   lower_tot = FALSE,
+  deff = FALSE,
   ...
 )
 
@@ -57,6 +59,8 @@ svyqsr(formula, design, ...)
 \item{upper_tot}{return the highest earners total}
 
 \item{lower_tot}{return the lowest earners total}
+
+\item{deff}{Return the design effect (see \code{survey::svymean}).}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.
