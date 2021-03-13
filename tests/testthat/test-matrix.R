@@ -1,5 +1,12 @@
 context("test-matrix makes sense across all functions' coefficients and standard errors")
 
+# set up functions
+these_functions <-
+  c( "svygei" , "svygeidec" , "svyjdiv" , "svyjdivdec" , "svyatk" ,
+     "svygpg" , "svyqsr" , "svypoormed" , "svyrmpg" , "svyrmir" , "svyisq" , "svyiqalpha" ,
+     "svyarpr" , "svyarpt" , "svygini" ,
+     "svyfgt" , "svyfgtdec" , "svychu" , "svywatts" , "svyrich" ,  "svylorenz" )
+
 test_that("coef and SE matrix values make sense",{
 
   # skip test on cran
@@ -27,70 +34,52 @@ test_that("coef and SE matrix values make sense",{
   des_eusilc <- subset( des_eusilc , eqincome > 0 )
   des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
-  # make initial object
-  out <- NULL
-
   # run across functions
-  for( this_fun in c( "svygei" , "svygpg" , "svyatk" , "svyqsr" , "svypoormed" , "svyrmpg" , "svyrmir" , "svyisq" , "svyiqalpha" , "svyarpr" , "svyarpt" , "svyfgt" , "svygini" ) ){
+  out <- lapply( these_functions , function( this_fun ) {
 
+    # # track process
+    # cat( this_fun , "\n")
+
+    # set up general function
     final_fun <- FUN <- get( this_fun )
-
     if( identical( FUN , svyrmpg ) ) final_fun <- function( ... ) FUN( ... , thresh = TRUE )
     if( identical( FUN , svyrmir ) ) final_fun <- function( ... ) FUN( ... , age = ~ age , med_old = TRUE )
     if( identical( FUN , svyisq ) ) final_fun <- function( ... ) FUN( ... , alpha = 0.2 )
     if( identical( FUN , svyiqalpha ) ) final_fun <- function( ... ) FUN( ... , alpha = 0.5 )
     if( identical( FUN , svyfgt ) ) final_fun <- function( ... ) FUN( ... , g = 0 , abs_thresh = 10000 )
+    if( identical( FUN , svyfgtdec ) ) final_fun <- function( ... ) FUN( ... , g = 2 , abs_thresh = 10000 )
+    if( identical( FUN , svychu ) ) final_fun <- function( ... ) FUN( ... , g = .5 , abs_thresh = 10000 )
+    if( identical( FUN , svywatts ) ) final_fun <- function( ... ) FUN( ... , abs_thresh = 10000 )
+    if( identical( FUN , svyrich ) ) final_fun <- function( ... ) FUN( ... , g = 2 , abs_thresh = 15000 , type_measure = "Cha"  )
     if( identical( FUN , svygpg ) ) final_fun <- function( ... ) FUN( ... , sex = ~ rb090 )
     if( identical( FUN , svygei ) ) final_fun <- function( ... ) FUN( ... , epsilon = 0.5 )
+    if( identical( FUN , svygeidec ) ) final_fun <- function( ... ) FUN( ... , epsilon = 0.5 , subgroup = ~rb090 )
+    if( identical( FUN , svyjdivdec ) ) final_fun <- function( ... ) FUN( ... , subgroup = ~rb090 )
+    if( identical( FUN , svyatk ) ) final_fun <- function( ... ) FUN( ... , epsilon = 0.5 )
+    if( identical( FUN , svyjdivdec ) ) final_fun <- function( ... ) FUN( ... , subgroup = ~rb090 )
+    if( identical( FUN , svylorenz ) ) final_fun <- function( ... ) FUN( ... , quantiles = seq(0,1,.05) )
 
+    # create objects
+    estimate_lin <- final_fun( ~ eqincome , des_eusilc )
+    estimate_rep <- final_fun( ~ eqincome , des_eusilc_rep )
 
+    # build dataframe
     this_df <-
       data.frame(
         function_name = this_fun ,
-        coef_lin = coef( final_fun( ~ eqincome , des_eusilc ) ) ,
-        se_lin = SE( final_fun( ~ eqincome , des_eusilc ) )[1] ,
-        coef_rep = coef( final_fun( ~ eqincome , des_eusilc_rep ) ) ,
-        se_rep = SE( final_fun( ~ eqincome , des_eusilc_rep ) )[1]
-      )
-
+        coef_lin = as.numeric( coef( estimate_lin ) ) ,
+        se_lin = as.numeric( SE( estimate_lin ) ),
+        coef_rep = as.numeric( coef( estimate_lin ) ) ,
+        se_rep = as.numeric( SE( estimate_lin ) ) ,
+        stringsAsFactors = FALSE )
     rownames( this_df ) <- NULL
+    this_df
 
-    out <- rbind( out , this_df )
-  }
+  } )
+  out <- do.call( rbind , out )
 
   # add descrition of mou
   out$measure_of_uncertainty <- "standard error"
-
-  # lorenz curve
-  lor_lin <- svylorenz( ~eqincome , des_eusilc, seq(0,1,.05), alpha = .01 , plot = FALSE )
-  lor_rep <- svylorenz( ~eqincome , des_eusilc_rep, seq(0,1,.05), alpha = .01 , plot = FALSE )
-
-  this_df <-
-    data.frame(
-      function_name = "svylorenz" ,
-      coef_lin = lor_lin$quantiles[5] ,
-      se_lin = lor_lin$quantiles[5] - lor_lin$CIs[9] ,
-      coef_rep = lor_rep$quantiles[5] ,
-      se_rep = lor_rep$quantiles[5] - lor_rep$CIs[9] ,
-      measure_of_uncertainty = "confidence interval length at median" )
-  rownames( this_df ) <- NULL
-  out <- rbind( out , this_df )
-
-  # gei decomposition
-  dec_lin <- svygeidec( ~eqincome , ~rb090 , des_eusilc , epsilon = .5 )
-  dec_rep <- svygeidec( ~eqincome , ~rb090 , des_eusilc_rep , epsilon = .5 )
-
-  this_df <-
-    data.frame(
-      function_name = paste( "svygeidec" , c( "total" , "within" , "between" ) ) ,
-      coef_lin = coef( dec_lin ) ,
-      se_lin = SE(dec_lin) ,
-      coef_rep = coef(dec_rep) ,
-      se_rep = SE(dec_rep) ,
-      measure_of_uncertainty = "standard error"
-    )
-  rownames( this_df ) <- NULL
-  out <- rbind( out , this_df )
 
   # reorder columns
   out <- out[ c( "function_name" , "measure_of_uncertainty" , "coef_lin" , "se_lin" , "coef_rep" , "se_rep" ) ]
@@ -105,10 +94,10 @@ test_that("coef and SE matrix values make sense",{
   isTRUE( expect_true( all.equal( out$linearized_coefficient , out$replication_coefficient ) ) )
 
   # test that the difference between the measure of uncertainty is a small fraction of replication designs
-  expect_true( all( abs( out$replication_mou - out$linearized_mou ) / out$replication_coefficient < 0.05 ) )
+  expect_true( all( abs( out$replication_mou - out$linearized_mou ) / out$replication_coefficient < 0.05 , na.rm = TRUE ) )
 
   # test that the difference between the measure of uncertainty is a small fraction of linearized designs
-  expect_true( all( abs( out$replication_mou - out$linearized_mou ) / out$linearized_coefficient < 0.05 ) )
+  expect_true( all( abs( out$replication_mou - out$linearized_mou ) / out$linearized_coefficient < 0.05 , na.rm = TRUE ) )
 
 } )
 
