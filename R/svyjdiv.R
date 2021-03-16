@@ -292,15 +292,23 @@ CalcJDiv_IF <-  function( y , w ) {
   y <- y[ w > 0]
   w <- w[ w > 0]
 
-  # compute point esitmate
+  # compute intermediate statistics
   N <- sum( w )
   mu <- sum( y * w ) / N
-  gei1 <- sum( w * ( y / mu ) * log( y / mu ) ) / N
   jdiv <- sum( w * ( ( y / mu ) - 1 ) * log( y / mu ) ) / N
-  mulin <- ( y - mu )/N
-  jdivlin <- ( ( ( y / mu ) - 1 ) * log( y / mu ) - jdiv ) / N - ( gei1 / mu ) * mulin
 
-  # compute point estimate
-  jdivlin
+  # influence function under fixed mean
+  y.score <- ( ( ( y / mu ) - 1 ) * log( y / mu ) )
+  lin.fixed <- ( y.score - jdiv ) / N
+
+  # derivative wrt mean
+  djdiv.dmu <- - sum( w * (y/mu^2) * y.score ) / N
+  I.mu <- ( y - mu )/N
+
+  # compute final influence function
+  lin <- lin.fixed + djdiv.dmu * I.mu
+
+  # return final influence function
+  return( lin )
 
 }
