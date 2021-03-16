@@ -48,6 +48,13 @@ a1 <- svyjdiv( ~eqincome , des_eusilc , deff = TRUE )
 a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyjdiv , deff = TRUE )
 b1 <- svyjdiv( ~eqincome , des_eusilc_rep , deff = TRUE )
 b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyjdiv , deff = TRUE )
+d1 <- svygei( ~eqincome , des_eusilc, epsilon = 0, deff = TRUE )
+e1 <- svygei( ~eqincome , des_eusilc, epsilon = 1, deff = TRUE )
+
+# des_eusilc$variables$lin.gei0 <- attr( d1 , "influence" )[ pmatch( rownames( des_eusilc ) , names( attr( d1 , "influence" ) ) ) ]
+# des_eusilc$variables$lin.gei1 <- attr( e1 , "influence" )[ pmatch( rownames( des_eusilc ) , names( attr( e1 , "influence" ) ) ) ]
+# des_eusilc$variables$lin.jdiv <- attr( a1 , "influence" )[ pmatch( rownames( des_eusilc ) , names( attr( a1 , "influence" ) ) ) ]
+# des_eusilc$variables$lin.test <- rowSums( des_eusilc$variables[ , c( "lin.gei0" , "lin.gei1" )] )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -76,6 +83,8 @@ test_that( "output svyjdiv" , {
   expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( attr( a1 , "influence" ) , attr( b1 , "influence" ) )
+  expect_equal( attr( a1 , "influence" ) , rowSums( sapply( list( d1 , e1 ) , attr , "influence" ) ) )
+  expect_equal( attr( b1 , "influence" ) , rowSums( sapply( list( d1 , e1 ) , attr , "influence" ) ) )
 } )
 
 ### test 2: income data from eusilc --- database-backed design object

@@ -312,45 +312,38 @@ CalcGEI_IF <-
     x <- x[ weights > 0 ]
     weights <- weights[ weights > 0 ]
 
-    # branch on epsilon
-    if ( epsilon == 0 ){
-      lin <-
-        -U_fn( x , weights , 0 )^( -1 ) *
-        log( x ) +
-        U_fn( x , weights ,  1 )^( -1 ) *
-        x +
-        U_fn( x , weights , 0 )^( -1 ) *
-        (
-          T_fn( x , weights , 0 ) *
-            U_fn( x , weights , 0 )^( -1 ) - 1
-        )
+    # compute intermediate statistics
+    N <- sum( weights )
+    X <- sum( weights * x )
+    mu <- X/N
 
-    } else if ( epsilon == 1) {
-
-      lin <-
-        U_fn( x , weights , 1 )^( -1 ) * x * log( x ) -
-        U_fn( x , weights , 1 )^( -1 ) * ( T_fn( x , weights , 1 ) * U_fn( x , weights, 1 )^( -1 ) + 1 ) * x +
-        U_fn( x , weights , 0 )^( -1 )
-
+    # compute transformed income
+    if ( epsilon == 0 ) {
+      y <- - log( x / mu )
+    } else if ( epsilon == 1 ) {
+      y <- ( x / mu ) * log( x / mu )
     } else {
-
-      lin <-
-        ( epsilon )^( -1 ) *
-        U_fn( x , weights , epsilon ) *
-        U_fn( x , weights , 1 )^( -epsilon ) *
-        U_fn( x , weights , 0 )^( epsilon - 2 ) -
-
-        ( epsilon - 1 )^( -1 ) *
-        U_fn( x , weights , epsilon ) *
-        U_fn( x , weights , 1 )^( -epsilon -1 ) *
-        U_fn( x , weights , 0 )^( epsilon - 1 ) * x +
-
-        ( epsilon^2 - epsilon )^( -1 ) *
-        U_fn( x , weights , 0 )^( epsilon - 1 ) *
-        U_fn( x , weights , 1 )^( -epsilon ) *
-        x^(epsilon)
-
+      y <- ( ( x / mu )^epsilon - 1 ) / ( epsilon^2 - epsilon )
     }
+    gei.val <- sum( y * weights ) / N
+
+    # influence function under fixed mean
+    lin.fixed <- ( y - gei.val ) / N
+
+    # compute derivative wrt mean
+    if ( epsilon == 0 ) {
+      dgei.dmu <- 1/mu
+    } else if ( epsilon == 1 ) {
+      dgei.dmu <- sum( weights * (-x/mu^2) * ( log( x / mu ) + 1 ) ) / N
+    } else {
+      dgei.dmu <- - sum( weights  *  (x/mu)^epsilon ) / ( X * ( epsilon - 1 ) )
+    }
+
+    # influence function of the mean
+    I.mu <- ( x - mu ) / N
+
+    # influence function
+    lin <- lin.fixed + dgei.dmu * I.mu
 
     # add indices
     names( lin ) <- names( weights )
