@@ -10,8 +10,8 @@ computeQuantiles <- function(xx, w, p) {
     if (any(is.na(xx)))
         return(NA * p)
 
-	if( sum( w ) == 0 ) return( NA )
-
+    xx <- xx[w>0]
+    w <- w[w>0]
     oo <- order(xx)
     cum.w <- cumsum(w[oo])/sum(w)
     cdf <- approxfun(cum.w, xx[oo], method = "constant", f = 1, yleft = min(xx),
