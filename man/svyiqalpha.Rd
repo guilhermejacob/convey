@@ -9,7 +9,15 @@
 \usage{
 svyiqalpha(formula, design, ...)
 
-\method{svyiqalpha}{survey.design}(formula, design, alpha, na.rm = FALSE, deff = FALSE, ...)
+\method{svyiqalpha}{survey.design}(
+  formula,
+  design,
+  alpha,
+  na.rm = FALSE,
+  deff = FALSE,
+  influence = FALSE,
+  ...
+)
 
 \method{svyiqalpha}{svyrep.design}(formula, design, alpha, na.rm = FALSE, deff = FALSE, ...)
 

@@ -37,10 +37,10 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svyiqalpha( ~eqincome , des_eusilc , alpha = .2 , deff = TRUE )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyiqalpha , alpha = .2 , deff = TRUE )
-b1 <- svyiqalpha( ~eqincome , des_eusilc_rep , alpha = .2 , deff = TRUE )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyiqalpha , alpha = .2 , deff = TRUE )
+a1 <- svyiqalpha( ~eqincome , des_eusilc , alpha = .2 , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyiqalpha , alpha = .2 , deff = TRUE , covmat = TRUE , influence = TRUE )
+b1 <- svyiqalpha( ~eqincome , des_eusilc_rep , alpha = .2 , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyiqalpha , alpha = .2 , deff = TRUE , covmat = TRUE , influence = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -103,8 +103,8 @@ test_that("database svyiqalpha",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svyiqalpha( ~ eqincome , dbd_eusilc , alpha = .2 , deff = TRUE )
-  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svyiqalpha , alpha = .2 , deff = TRUE )
+  c1 <- svyiqalpha( ~ eqincome , dbd_eusilc , alpha = .2 , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svyiqalpha , alpha = .2 , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -127,10 +127,10 @@ test_that("database svyiqalpha",{
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyiqalpha( ~eqincome , design = subset( des_eusilc , hsize == 1) , alpha = .2 , deff = TRUE )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyiqalpha , alpha = .2 , deff = TRUE )
-sub_rep <- svyiqalpha( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , alpha = .2 , deff = TRUE )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyiqalpha , alpha = .2 , deff = TRUE )
+sub_des <- svyiqalpha( ~eqincome , design = subset( des_eusilc , hsize == 1) , alpha = .2 , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyiqalpha , alpha = .2 , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svyiqalpha( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , alpha = .2 , deff = TRUE , influence = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyiqalpha , alpha = .2 , deff = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -158,6 +158,7 @@ test_that("subsets equal svyby",{
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( sub_des , "influence" ) , attr( sub_rep , "influence" ) )
+  # expect_equal( attr( sby_des , "influence" ) , attr( sby_rep , "influence" ) )
 
 } )
 
@@ -208,10 +209,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svyiqalpha( ~eqincome , design = subset( des_eusilc , hsize == 1) , alpha = .2 , deff = TRUE )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyiqalpha , alpha = .2 , deff = TRUE )
-  sub_dbr <- svyiqalpha( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , alpha = .2 , deff = TRUE )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyiqalpha , alpha = .2 , deff = TRUE )
+  sub_dbd <- svyiqalpha( ~eqincome , design = subset( des_eusilc , hsize == 1) , alpha = .2 , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyiqalpha , alpha = .2 , deff = TRUE , covmat = TRUE )
+  sub_dbr <- svyiqalpha( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , alpha = .2 , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyiqalpha , alpha = .2 , deff = TRUE , covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )

@@ -160,6 +160,7 @@ T_fn <-
 #' @export
 print.cvystat <- function(x, ...) {
 
+  if (is.list(x)) x <- x[[1]]
   vv <- attr(x, "var")
 
   if (is.matrix(vv)) {
@@ -188,6 +189,7 @@ print.cvystat <- function(x, ...) {
 # cvystat vcov method
 #' @export
 vcov.cvystat <- function (object, ...) {
+  if (is.list(object)) object <- object[[1]]
   as.matrix(attr(object, "var"))
 }
 
@@ -201,6 +203,7 @@ vcov.cvyquantile <- function (object, ...) {
 # cvystat coef method
 #' @export
 coef.cvystat <- function(object, ...) {
+  if (is.list(object)) object <- object[[1]]
   attr(object, "statistic") <- NULL
   attr(object, "deff") <- NULL
   attr(object, "var") <- NULL
@@ -278,97 +281,3 @@ convey_prep <- function(design) {
 
   design
 }
-
-# convey.design svyby method
-#' @importFrom survey svyby
-#' @method svyby convey.design
-#' @export
-svyby.convey.design <-
-  function (formula, by, design, ...){
-
-    if ( ( "DBIsvydesign" %in% class(design) ) & !( "logical" %in% class(attr(design, "full_design"))) ){
-
-      full_design <- attr( design , "full_design" )
-
-      if( 'sex' %in% names( list( ... ) ) ){
-
-        full_design$variables <-
-          cbind(
-            getvars(formula, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset),
-            getvars(by, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset) ,
-            getvars(list( ... )[["sex"]], full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset)
-          )
-
-        design$variables <-
-          cbind(
-            getvars(formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset),
-            getvars(by, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset) ,
-            getvars(list( ... )[["sex"]], design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
-          )
-
-      } else if( 'age' %in% names( list( ... ) ) ){
-
-        full_design$variables <-
-          cbind(
-            getvars(formula, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset),
-            getvars(by, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset) ,
-            getvars(list( ... )[["age"]], full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset)
-          )
-
-        design$variables <-
-          cbind(
-            getvars(formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset),
-            getvars(by, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset) ,
-            getvars(list( ... )[["age"]], design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
-          )
-
-
-      } else if( 'subgroup' %in% names( list( ... ) ) ){
-
-        full_design$variables <-
-          cbind(
-            getvars(formula, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset),
-            getvars(by, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset) ,
-            getvars(list( ... )[["subgroup"]], full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset)
-          )
-
-        design$variables <-
-          cbind(
-            getvars(formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset),
-            getvars(by, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset) ,
-            getvars(list( ... )[["subgroup"]], design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
-          )
-
-
-      } else {
-
-        full_design$variables <-
-          cbind(
-            getvars(formula, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset),
-            getvars(by, full_design$db$connection, full_design$db$tablename, updates = full_design$updates, subset = full_design$subset)
-          )
-
-
-        design$variables <-
-          cbind(
-            getvars(formula, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset),
-            getvars(by, design$db$connection, design$db$tablename, updates = design$updates, subset = design$subset)
-          )
-
-
-      }
-
-      attr( design , "full_design" ) <- full_design
-
-      rm( full_design )
-
-    }
-
-    # remove the "convey.design" and "DBIsvydesign" classes from the current object
-    class(design) <- setdiff(class(design), "convey.design")
-    class(design) <- setdiff(class(design), "DBIsvydesign")
-
-    survey::svyby(formula,by,design,...)
-  }
-
-

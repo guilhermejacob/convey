@@ -8,6 +8,7 @@
 #' @return Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.
 #' @param na.rm Should cases with missing values be dropped?
 #' @param deff Return the design effect (see \code{survey::svymean}).
+#' @param influence Should a matrix of influence functions be returned?
 #' @param ... arguments passed on to `survey::svyquantile`
 #'
 #' @details you must run the \code{convey_prep} function on your survey design object immediately after creating it with the \code{svydesign} or \code{svrepdesign} function.
@@ -93,7 +94,7 @@ svyiqalpha <-
 #' @rdname svyiqalpha
 #' @export
 svyiqalpha.survey.design <-
-  function(formula, design, alpha, na.rm=FALSE, deff= FALSE , ...) {
+  function(formula, design, alpha, na.rm=FALSE, deff= FALSE , influence = FALSE , ...) {
 
     # collect data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -131,7 +132,7 @@ svyiqalpha.survey.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff) {
+    if ( is.character(deff) || deff || influence ) {
       nobs <- sum( weights( design ) != 0 )
       npop <- sum( weights( design ) )
       if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
@@ -142,13 +143,16 @@ svyiqalpha.survey.design <-
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
 
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     rval <- estimate
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "quantile"
-    attr(rval,"influence") <- lin
+    if ( influence ) attr(rval,"influence") <- lin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
@@ -158,7 +162,7 @@ svyiqalpha.survey.design <-
 #' @export
 #'
 svyiqalpha.svyrep.design <-
-  function(formula, design, alpha, na.rm=FALSE, deff = FALSE , ...) {
+  function(formula, design, alpha, na.rm=FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -211,6 +215,9 @@ svyiqalpha.svyrep.design <-
       # filter observation
       names( lin ) <- rownames( design$variables )
 
+      # coerce to matrix
+      lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # build result object
@@ -220,7 +227,18 @@ svyiqalpha.svyrep.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "quantile"
     if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
+    if ( influence ) attr( rval , "influence" ) <- lin
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- design$scale
+      attr( qq , "rscales") <- design$rscales
+      attr( qq , "mse") <- design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # retorna objeto
     rval
 
   }
