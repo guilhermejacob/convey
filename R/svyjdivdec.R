@@ -1,4 +1,4 @@
-#' J-Divergence Decomposition (EXPERIMENTAL)
+#' J-Divergence Decomposition
 #'
 #' Estimates the group decomposition of the generalized entropy index
 #'
@@ -114,7 +114,7 @@ svyjdivdec <-
 #' @rdname svyjdivdec
 #' @export
 svyjdivdec.survey.design <-
-  function ( formula, subgroup, design, na.rm = FALSE, ... ) {
+  function ( formula, subgroup, design, na.rm = FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ... ) {
 
     # collect income and subgroup data
     incvar <- model.frame( formula , design$variables , na.action = na.pass )[,]
@@ -237,10 +237,23 @@ svyjdivdec.survey.design <-
       lin.matrix <- lin.matrix[ pmatch( rownames( design$variables ) , rownames(lin.matrix ) ) , ]
       lin.matrix[ w <= 0 , ] <- 0
     }
+    rownames( lin.matrix ) <- rownames( design$variables )
 
     # compute variance
     variance <- survey::svyrecvar( sweep( lin.matrix , 1 , 1/design$prob , "*" ) , design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
     variance[ which( is.nan( variance ) ) ] <- NA
+
+    # compute deff
+    if ( is.character(deff) || deff || influence ) {
+      nobs <- sum( weights( design ) != 0 )
+      npop <- sum( weights( design ) )
+      if (deff == "replace") vsrs <- svyvar( lin.matrix , design, na.rm = na.rm) * npop^2/nobs
+      else vsrs <- svyvar( lin.matrix , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+      deff.estimate <- variance/vsrs
+    }
+
+    # keep necessary influence functions
+    lin.matrix <- lin.matrix[ 1/design$prob > 0 , ]
 
     # build result object
     rval <- c( estimates )
@@ -248,6 +261,8 @@ svyjdivdec.survey.design <-
     attr(rval, "statistic") <- "jdiv decomposition"
     attr(rval,"group")<- as.character( subgroup )[[2]]
     class(rval) <- c( "cvystat" , "svystat" )
+    if ( influence ) attr(rval,"influence") <- lin.matrix
+    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
   }
@@ -256,7 +271,7 @@ svyjdivdec.survey.design <-
 #' @rdname svyjdivdec
 #' @export
 svyjdivdec.svyrep.design <-
-  function( formula, subgroup, design, na.rm=FALSE, ...) {
+  function( formula, subgroup, design, na.rm=FALSE, deff = FALSE ,influence = FALSE , return.replicates = FALSE , ...) {
 
     # collect income and group data
     incvar <- model.frame( formula, design$variables, na.action = na.pass )[,]
@@ -278,7 +293,6 @@ svyjdivdec.svyrep.design <-
 
     # apply interaction
     grpmat <- model.matrix( update( subgroup , ~.+0 ) , design$variables )
-
 
     # compute point estimates
     N <- sum( ws )
@@ -323,6 +337,109 @@ svyjdivdec.svyrep.design <-
       variance <- survey::svrVar( qq , design$scale, design$rscales, mse = design$mse, coef = estimates )
     }
 
+    # deff calculation
+    if ( is.character(deff) || deff || influence ) {
+
+      ### compute influence function matrix
+
+      # compute influence function
+      total.jdivlin <- CalcJDiv_IF( incvar, ws )
+
+      # add interaction
+      grpvar <- interaction( grpvar )
+
+      # create matrix of group-specific weights
+      wg <- sapply( levels(grpvar) , function(z) ifelse( grpvar == z , ws , 0 ) )
+
+      # calculate group-specific GEI_0 and influence functions
+      grp.gei0 <- lapply( colnames( wg )  , function( this.group ) {
+        wi <- wg[ , this.group ]
+        statobj <- list(
+          value = CalcGEI( x = incvar, weights = wi , epsilon = 0 ) ,
+          lin = CalcGEI_IF( x = incvar, weights = wi , epsilon = 0 ) )
+        lin2 <- rep( 0 , length( wi ) )
+        lin2[ wi > 0 ] <- statobj$lin
+        statobj$lin <- lin2
+        statobj
+      } )
+      names( grp.gei0 ) <- colnames( wg )
+
+      # calculate group-specific GEI_1 and influence functions
+      grp.gei1 <- lapply( colnames( wg )  , function( this.group ) {
+        wi <- wg[ , this.group ]
+        statobj <- list(
+          value = CalcGEI( x = incvar, weights = wi , epsilon = 1 ) ,
+          lin = CalcGEI_IF( x = incvar, weights = wi , epsilon = 1 ) )
+        lin2 <- rep( 0 , length( wi ) )
+        lin2[ wi > 0 ] <- statobj$lin
+        statobj$lin <- lin2
+        statobj
+      } )
+      names( grp.gei1 ) <- colnames( wg )
+
+      # calculate gei0 within component weight
+      grp.gei0.wgt <- lapply( colnames( wg ) , function(i) {
+
+        wi <- wg[,i]
+        this.linformula <- quote( ( N.g / N ) )
+        contrastinf(
+          this.linformula ,
+          list( Y.g = list( value = sum( incvar * wi , na.rm = TRUE ) , lin = incvar * ( wi > 0 ) ) ,
+                Y = list( value = sum( incvar * ws , na.rm = TRUE ) , lin = incvar * ( ws > 0 ) ) ,
+                N.g = list( value = sum( wi , na.rm = TRUE ) , lin = ( wi > 0 ) ) ,
+                N = list( value = sum( ws , na.rm = TRUE ) , lin = ( ws > 0 ) ) ) )
+
+      } )
+      names( grp.gei0.wgt ) <- colnames( wg )
+
+      # calculate gei1 within component weight
+      grp.gei1.wgt <- lapply( colnames( wg ) , function(i) {
+
+        wi <- wg[,i]
+        this.linformula <- quote( ( Y.g / Y ) )
+        contrastinf(
+          this.linformula ,
+          list( Y.g = list( value = sum( incvar * wi , na.rm = TRUE ) , lin = incvar * ( wi > 0 ) ) ,
+                Y = list( value = sum( incvar * ws , na.rm = TRUE ) , lin = incvar * ( ws > 0 ) ) ,
+                N.g = list( value = sum( wi , na.rm = TRUE ) , lin = ( wi > 0 ) ) ,
+                N = list( value = sum( ws , na.rm = TRUE ) , lin = ( ws > 0 ) ) ) )
+
+      } )
+      names( grp.gei1.wgt ) <- colnames( wg )
+
+      # compute combined within components
+      gei0.within.components <-
+        list(
+          value = sapply( grp.gei0.wgt , `[[` , "value" ) * sapply( grp.gei0 , `[[` , "value" ) ,
+          lin = sweep( sapply( grp.gei0 , `[[` , "lin" ) , 2 , sapply( grp.gei0.wgt , `[[` , "value" ) , "*" ) +
+            sweep( sapply( grp.gei0.wgt , `[[` , "lin" ) , 2 , sapply( grp.gei0 , `[[` , "value" ) , "*" ) )
+      gei1.within.components <-
+        list(
+          value = sapply( grp.gei1.wgt , `[[` , "value" ) * sapply( grp.gei1 , `[[` , "value" ) ,
+          lin = sweep( sapply( grp.gei1 , `[[` , "lin" ) , 2 , sapply( grp.gei1.wgt , `[[` , "value" ) , "*" ) +
+            sweep( sapply( grp.gei1.wgt , `[[` , "lin" ) , 2 , sapply( grp.gei1 , `[[` , "value" ) , "*" ) )
+      within.jdiv <- sum( gei0.within.components$value + gei1.within.components$value )
+      within.jdivlin <- rowSums( gei0.within.components$lin + gei1.within.components$lin )[ ws > 0 ]
+
+      # compute between
+      between.jdiv <- total.jdiv - within.jdiv
+      between.jdivlin <- total.jdivlin - within.jdivlin
+
+      # create matrix
+      lin.matrix <- matrix( data = c( total.jdivlin , within.jdivlin , between.jdivlin ), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
+      rownames( lin.matrix ) <- rownames( design$variables )
+
+      ## deff calculation
+
+      # compute deff
+      nobs <- length( design$pweights )
+      npop <- sum( design$pweights )
+      vsrs <- unclass( svyvar( lin.matrix , design, na.rm = na.rm, return.replicates = FALSE, estimate.only = TRUE)) * npop^2/nobs
+      if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
+      deff.estimate <- variance / vsrs
+
+    }
+
     # build result object
     rval <- estimates
     names( rval ) <- c( "total", "within", "between" )
@@ -330,6 +447,19 @@ svyjdivdec.svyrep.design <-
     attr(rval, "statistic") <- "j-divergence decomposition"
     attr(rval,"group")<- as.character( subgroup )[[2]]
     class(rval) <- c( "cvystat" , "svrepstat" , "svystat" )
+    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
+    if ( influence ) attr( rval , "influence" ) <- lin.matrix
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- design$scale
+      attr( qq , "rscales") <- design$rscales
+      attr( qq , "mse") <- design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class(rval) <- c( "cvystat" , "svrepstat" , "svystat" )
+    }
+
+    # return value
     rval
 
   }

@@ -27,19 +27,20 @@ des_eusilc <- subset( des_eusilc , eqincome >0 )
 des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
 # calculate estimates
-a1 <- svyjdivdec( ~eqincome , des_eusilc , subgroup = ~db040 )
-a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyjdivdec , subgroup = ~db040 )
-b1 <- svyjdivdec( ~eqincome , des_eusilc_rep , subgroup = ~db040 )
-b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svyjdivdec , subgroup = ~db040 )
-d1 <- svyjdiv( ~eqincome , des_eusilc )
+a1 <- svyjdivdec( ~eqincome , des_eusilc , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyjdivdec , subgroup = ~db040 , deff = TRUE , influence = TRUE , covmat = TRUE )
+b1 <- svyjdivdec( ~eqincome , des_eusilc_rep , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svyjdivdec , subgroup = ~db040 , deff = TRUE , return.replicates = TRUE , covmat = TRUE )
+d1 <- svyjdiv( ~eqincome , des_eusilc , influence = TRUE )
 d2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyjdiv )
 
 # calculate auxillliary tests statistics
-cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ))
+cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ) )
 se_diff2 <- max( abs( SE( a2 ) - SE( b2 ) ) , na.rm = TRUE )
 
 # perform tests
 test_that( "output svyjdivdec" , {
+
   expect_is( coef( a1 ) ,"numeric" )
   expect_is( coef( a2 ) , "numeric" )
   expect_is( coef( b1 ) ,"numeric" )
@@ -56,8 +57,10 @@ test_that( "output svyjdivdec" , {
   expect_equal( as.numeric( coef( a2 )[1:2] ) , as.numeric( coef( d2 ) ) )
 
   # compare with svyjdiv
+  expect_equal( coef( a1 )[[1]] , coef( d1 )[[1]] )
   expect_equal( SE( a1 )[[1]] , SE( d1 )[[1]] )
   expect_equal( as.numeric( SE( a2 )[,1] ) , as.numeric( SE( d2 ) ) )
+  expect_equal( attr( a1 , "influence" )[,1] , attr( d1 , "influence" )[,1] )
 
 } )
 
@@ -96,8 +99,8 @@ test_that("database svyjdiv",{
   dbd_eusilc <- subset( dbd_eusilc , eqincome >0 )
 
   # calculate estimates
-  c1 <- svyjdivdec( ~eqincome , dbd_eusilc , subgroup = ~db040 )
-  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svyjdivdec , subgroup = ~db040 )
+  c1 <- svyjdivdec( ~eqincome , dbd_eusilc , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svyjdivdec , subgroup = ~db040 , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -108,16 +111,19 @@ test_that("database svyjdiv",{
   expect_equal( coef( a2 ) , coef( c2 )[ match( names( coef( c2 ) ) , names( coef( a2 ) ) ) ] )
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 )[ 2:1 , ] )
+  expect_equal( deff( a1 ) , deff( c1 ) )
+  expect_equal( deff( a2 ) , deff( c2 )[ 2:1 , ] )
+  expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
 
 } )
 
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyjdivdec( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , subgroup = ~db040 )
-sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyjdivdec , subgroup = ~db040 )
-sub_rep <- svyjdivdec( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , subgroup = ~db040 )
-sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyjdivdec , subgroup = ~db040 )
+sub_des <- svyjdivdec( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyjdivdec , subgroup = ~db040 , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svyjdivdec( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyjdivdec , subgroup = ~db040 , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -130,6 +136,10 @@ test_that("subsets equal svyby",{
   expect_equal( as.numeric( SE( sub_des ) ) , as.numeric( SE( sby_des[1,] ) ) )
   expect_equal( as.numeric( SE( sub_rep ) ) , as.numeric( SE( sby_rep[1,] ) ) )
 
+  # domain vs svyby: DEffs must be equal
+  expect_equal( as.numeric( deff( sub_des ) ) , as.numeric( deff( sby_des[1,] ) ) )
+  expect_equal( as.numeric( deff( sub_rep ) ) , as.numeric( deff( sby_rep[1,] ) ) )
+
   # domain vs svyby and svydesign vs svyrepdesign:
   # coefficients should match across svydesign
   expect_equal( as.numeric( coef( sub_des ) ) , as.numeric( coef( sby_rep[1,] ) ) )
@@ -137,7 +147,7 @@ test_that("subsets equal svyby",{
   # domain vs svyby and svydesign vs svyrepdesign:
   # coefficients of variation should be within five percent
   cv_diff <- max( abs( cv( sub_des ) - cv( sby_rep )[1,] ) )
-  # expect_lte( cv_diff , .05 )
+  expect_lte( cv_diff , .05 )
 
 } )
 
@@ -193,10 +203,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- subset( dbd_eusilc_rep , eqincome >0 )
 
   # calculate estimates
-  sub_dbd <- svyjdivdec( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , subgroup = ~db040 )
-  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svyjdivdec , subgroup = ~db040 )
-  sub_dbr <- svyjdivdec( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , subgroup = ~db040 )
-  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svyjdivdec , subgroup = ~db040 )
+  sub_dbd <- svyjdivdec( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svyjdivdec , subgroup = ~db040 , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_dbr <- svyjdivdec( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , subgroup = ~db040 , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svyjdivdec , subgroup = ~db040 , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -207,6 +217,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( coef( sub_rep ) , coef( sub_dbr ) )
   expect_equal( SE( sub_des ) , SE( sub_dbd ) )
   expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
+  expect_equal( deff( sub_des ) , deff( sub_dbd ) )
+  expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
+  expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
 
   # compare database-backed subsetted objects to database-backed svyby objects
   # dbi subsets equal dbi svyby

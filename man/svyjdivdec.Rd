@@ -5,13 +5,31 @@
 \alias{svyjdivdec.survey.design}
 \alias{svyjdivdec.svyrep.design}
 \alias{svyjdivdec.DBIsvydesign}
-\title{J-Divergence Decomposition (EXPERIMENTAL)}
+\title{J-Divergence Decomposition}
 \usage{
 svyjdivdec(formula, subgroup, design, ...)
 
-\method{svyjdivdec}{survey.design}(formula, subgroup, design, na.rm = FALSE, ...)
+\method{svyjdivdec}{survey.design}(
+  formula,
+  subgroup,
+  design,
+  na.rm = FALSE,
+  deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
+  ...
+)
 
-\method{svyjdivdec}{svyrep.design}(formula, subgroup, design, na.rm = FALSE, ...)
+\method{svyjdivdec}{svyrep.design}(
+  formula,
+  subgroup,
+  design,
+  na.rm = FALSE,
+  deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
+  ...
+)
 
 \method{svyjdivdec}{DBIsvydesign}(formula, subgroup, design, ...)
 }

@@ -19,7 +19,16 @@ svyiqalpha(formula, design, ...)
   ...
 )
 
-\method{svyiqalpha}{svyrep.design}(formula, design, alpha, na.rm = FALSE, deff = FALSE, ...)
+\method{svyiqalpha}{svyrep.design}(
+  formula,
+  design,
+  alpha,
+  na.rm = FALSE,
+  deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
+  ...
+)
 
 \method{svyiqalpha}{DBIsvydesign}(formula, design, ...)
 }
@@ -35,6 +44,8 @@ svyiqalpha(formula, design, ...)
 \item{na.rm}{Should cases with missing values be dropped?}
 
 \item{deff}{Return the design effect (see \code{survey::svymean}).}
+
+\item{influence}{Should a matrix of influence functions be returned?}
 }
 \value{
 Object of class "\code{cvystat}", which are vectors with a "\code{var}" attribute giving the variance and a "\code{statistic}" attribute giving the name of the statistic.

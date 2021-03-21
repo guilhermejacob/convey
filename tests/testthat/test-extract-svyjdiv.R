@@ -44,17 +44,18 @@ des_eusilc <- subset( des_eusilc , eqincome > 0 )
 des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
 # calculate estimates
-a1 <- svyjdiv( ~eqincome , des_eusilc , deff = TRUE )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyjdiv , deff = TRUE )
-b1 <- svyjdiv( ~eqincome , des_eusilc_rep , deff = TRUE )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyjdiv , deff = TRUE )
-d1 <- svygei( ~eqincome , des_eusilc, epsilon = 0, deff = TRUE )
-e1 <- svygei( ~eqincome , des_eusilc, epsilon = 1, deff = TRUE )
+a1 <- svyjdiv( ~eqincome , des_eusilc , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyjdiv , deff = TRUE , influence = TRUE , covmat = TRUE )
+b1 <- svyjdiv( ~eqincome , des_eusilc_rep , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyjdiv , deff = TRUE , return.replicates = TRUE , covmat = TRUE )
+d1 <- svygei( ~eqincome , des_eusilc, epsilon = 0, deff = TRUE , influence = TRUE )
+e1 <- svygei( ~eqincome , des_eusilc, epsilon = 1, deff = TRUE , influence = TRUE )
 
-# des_eusilc$variables$lin.gei0 <- attr( d1 , "influence" )[ pmatch( rownames( des_eusilc ) , names( attr( d1 , "influence" ) ) ) ]
-# des_eusilc$variables$lin.gei1 <- attr( e1 , "influence" )[ pmatch( rownames( des_eusilc ) , names( attr( e1 , "influence" ) ) ) ]
-# des_eusilc$variables$lin.jdiv <- attr( a1 , "influence" )[ pmatch( rownames( des_eusilc ) , names( attr( a1 , "influence" ) ) ) ]
+# des_eusilc$variables$lin.gei0 <- attr( d1 , "influence" )[ pmatch( rownames( des_eusilc ) , rownames( attr( d1 , "influence" ) ) ) ]
+# des_eusilc$variables$lin.gei1 <- attr( e1 , "influence" )[ pmatch( rownames( des_eusilc ) , rownames( attr( e1 , "influence" ) ) ) ]
+# des_eusilc$variables$lin.jdiv <- attr( a1 , "influence" )[ pmatch( rownames( des_eusilc ) , rownames( attr( a1 , "influence" ) ) ) ]
 # des_eusilc$variables$lin.test <- rowSums( des_eusilc$variables[ , c( "lin.gei0" , "lin.gei1" )] )
+# colSums( des_eusilc$variables[ , c( "lin.test" , "lin.jdiv" )] )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -83,8 +84,10 @@ test_that( "output svyjdiv" , {
   expect_equal( sum( confint( b2 )[,1] <= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( sum( confint( b2 )[,2] >= coef( b2 ) ) , length( coef( b2 ) ) )
   expect_equal( attr( a1 , "influence" ) , attr( b1 , "influence" ) )
-  expect_equal( attr( a1 , "influence" ) , rowSums( sapply( list( d1 , e1 ) , attr , "influence" ) ) )
-  expect_equal( attr( b1 , "influence" ) , rowSums( sapply( list( d1 , e1 ) , attr , "influence" ) ) )
+  expect_equal( as.numeric( coef( a1 ) ) , as.numeric( sum( sapply( list( d1 , e1 ) , coef ) ) ) )
+  expect_equal( as.numeric( coef( a1 ) ) , as.numeric( sum( sapply( list( d1 , e1 ) , coef ) ) ) )
+  expect_equal( rowSums( attr( a1 , "influence" ) ) , rowSums( do.call( cbind , lapply( list( d1 , e1 ) , attr , "influence" ) ) ) )
+  expect_equal( rowSums( attr( b1 , "influence" ) ) , rowSums( do.call( cbind , lapply( list( d1 , e1 ) , attr , "influence" ) ) ) )
 } )
 
 ### test 2: income data from eusilc --- database-backed design object
@@ -122,8 +125,8 @@ test_that("database svyjdiv",{
   dbd_eusilc <- subset( dbd_eusilc , eqincome > 0 )
 
   # calculate estimates
-  c1 <- svyjdiv( ~ eqincome , dbd_eusilc , deff = TRUE )
-  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svyjdiv , deff = TRUE )
+  c1 <- svyjdiv( ~ eqincome , dbd_eusilc , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svyjdiv , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -145,10 +148,10 @@ test_that("database svyjdiv",{
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyjdiv( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyjdiv , deff = TRUE )
-sub_rep <- svyjdiv( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyjdiv , deff = TRUE )
+sub_des <- svyjdiv( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyjdiv , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svyjdiv( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE , influence = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyjdiv , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -230,10 +233,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- subset( dbd_eusilc_rep , eqincome > 0 )
 
   # calculate estimates
-  sub_dbd <- svyjdiv( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyjdiv , deff = TRUE )
-  sub_dbr <- svyjdiv( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyjdiv , deff = TRUE )
+  sub_dbd <- svyjdiv( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyjdiv , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_dbr <- svyjdiv( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyjdiv , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )

@@ -133,7 +133,7 @@ svygei <-
 #' @rdname svygei
 #' @export
 svygei.survey.design <-
-  function ( formula, design, epsilon = 1, na.rm = FALSE, deff= FALSE , ... ) {
+  function ( formula, design, epsilon = 1, na.rm = FALSE, deff= FALSE , influence = FALSE , ... ) {
 
     # collect income data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -163,6 +163,7 @@ svygei.survey.design <-
       lin <- lin[pmatch( rownames( design$variables ) , names(lin) ) ]
       lin[ w <= 0] <- 0
     }
+    names( lin ) <- rownames( design$variables )
 
     # compute variance
     variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
@@ -170,7 +171,7 @@ svygei.survey.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff) {
+    if ( is.character( deff ) || deff ) {
       nobs <- sum( weights( design ) != 0 )
       npop <- sum( weights( design ) )
       if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
@@ -181,6 +182,9 @@ svygei.survey.design <-
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
 
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     rval <- estimate
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -188,7 +192,7 @@ svygei.survey.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gei"
     attr(rval,"epsilon")<- epsilon
-    attr(rval,"influence") <- lin
+    if ( influence ) attr(rval,"influence") <- lin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
@@ -198,7 +202,7 @@ svygei.survey.design <-
 #' @rdname svygei
 #' @export
 svygei.svyrep.design <-
-  function(formula, design, epsilon = 1,na.rm=FALSE, deff= FALSE ,...) {
+  function( formula , design , epsilon = 1 , na.rm=FALSE , deff= FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # collect income variable
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -236,7 +240,7 @@ svygei.svyrep.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute influence function
       lin <- CalcGEI_IF( incvar , ws , epsilon )
@@ -251,6 +255,9 @@ svygei.svyrep.design <-
       # filter observation
       names( lin ) <- rownames( design$variables )
 
+      # coerce to matrix
+      lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # build result object
@@ -260,8 +267,19 @@ svygei.svyrep.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gei"
     attr(rval,"epsilon") <- epsilon
-    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
+    if ( influence ) attr( rval , "influence" ) <- lin
+    if ( is.character(deff) || deff ) attr( rval , "deff" ) <- deff.estimate
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- design$scale
+      attr( qq , "rscales") <- design$rscales
+      attr( qq , "mse") <- design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }
@@ -335,6 +353,7 @@ CalcGEI_IF <-
       dgei.dmu <- 1/mu
     } else if ( epsilon == 1 ) {
       dgei.dmu <- sum( weights * (-x/mu^2) * ( log( x / mu ) + 1 ) ) / N
+      # dgei.dmu <- -( gei.val + 1 ) / mu
     } else {
       dgei.dmu <- - sum( weights  *  (x/mu)^epsilon ) / ( X * ( epsilon - 1 ) )
     }

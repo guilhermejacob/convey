@@ -193,12 +193,12 @@ vcov.cvystat <- function (object, ...) {
   as.matrix(attr(object, "var"))
 }
 
-# cvystat vcov method
-#' @export
-vcov.cvyquantile <- function (object, ...) {
-  as.matrix(attr(object, "var"))
-}
-
+#' # cvystat deff method
+#' #' @export
+#' deff.cvystat <- function (object, ...) {
+#'   if ( is.list( object ) ) object <- object[[1]]
+#'   survey::deff( object )
+#' }
 
 # cvystat coef method
 #' @export
@@ -216,7 +216,6 @@ coef.cvystat <- function(object, ...) {
   attr(object, "components") <- NULL
   attr(object, "group") <- NULL
   attr(object, "thresh") <- NULL
-  attr(object, "deff") <- NULL
   unclass(object)
 }
 

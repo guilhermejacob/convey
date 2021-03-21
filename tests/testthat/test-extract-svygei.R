@@ -47,10 +47,10 @@ for ( this.epsilon in c(0,.5,1,2) ) {
   des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
   # calculate estimates
-  a1 <- svygei( ~eqincome , des_eusilc , epsilon = this.epsilon , deff = TRUE )
-  a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygei , epsilon = this.epsilon , deff = TRUE )
-  b1 <- svygei( ~eqincome , des_eusilc_rep , epsilon = this.epsilon , deff = TRUE )
-  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygei , epsilon = this.epsilon , deff = TRUE )
+  a1 <- svygei( ~eqincome , des_eusilc , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+  a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygei , epsilon = this.epsilon , deff = TRUE , influence = TRUE , covmat = TRUE )
+  b1 <- svygei( ~eqincome , des_eusilc_rep , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygei , epsilon = this.epsilon , deff = TRUE , return.replicates = TRUE , covmat = TRUE )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -116,8 +116,8 @@ for ( this.epsilon in c(0,.5,1,2) ) {
     dbd_eusilc <- subset( dbd_eusilc , eqincome > 0 )
 
     # calculate estimates
-    c1 <- svygei( ~ eqincome , dbd_eusilc , epsilon = this.epsilon , deff = TRUE )
-    c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svygei , epsilon = this.epsilon , deff = TRUE )
+    c1 <- svygei( ~eqincome , dbd_eusilc , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc, svygei , epsilon = this.epsilon , deff = TRUE , influence = TRUE , covmat = TRUE )
 
     # remove table and close connection to database
     dbRemoveTable( conn , 'eusilc' )
@@ -140,10 +140,10 @@ for ( this.epsilon in c(0,.5,1,2) ) {
   ### test 3: compare subsetted objects to svyby objects
 
   # calculate estimates
-  sub_des <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = this.epsilon , deff = TRUE )
-  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = this.epsilon , deff = TRUE )
-  sub_rep <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = this.epsilon , deff = TRUE )
-  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = this.epsilon , deff = TRUE )
+  sub_des <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = this.epsilon , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_rep <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = this.epsilon , deff = TRUE , return.replicates = TRUE , covmat = TRUE )
 
   # perform tests
   test_that("subsets equal svyby",{
@@ -225,10 +225,10 @@ for ( this.epsilon in c(0,.5,1,2) ) {
     dbd_eusilc_rep <- subset( dbd_eusilc_rep , eqincome > 0 )
 
     # calculate estimates
-    sub_dbd <- svygei( ~eqincome , design = subset( des_eusilc , hsize == 1) , epsilon = this.epsilon , deff = TRUE )
-    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygei , epsilon = this.epsilon , deff = TRUE )
-    sub_dbr <- svygei( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , epsilon = this.epsilon , deff = TRUE )
-    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygei , epsilon = this.epsilon , deff = TRUE )
+    sub_dbd <- svygei( ~eqincome , design = subset( dbd_eusilc     , hsize == 1) , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+    sub_dbr <- svygei( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , epsilon = this.epsilon , deff = TRUE , influence = TRUE )
+    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc     , FUN = svygei , epsilon = this.epsilon , deff = TRUE , influence = TRUE , covmat = TRUE )
+    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep , FUN = svygei , epsilon = this.epsilon , deff = TRUE , return.replicates = TRUE , covmat = TRUE )
 
     # remove table and disconnect from database
     dbRemoveTable( conn , 'eusilc' )

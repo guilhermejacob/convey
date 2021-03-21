@@ -95,7 +95,7 @@ svyjdiv <- function(formula, design, ...) {
 
 #' @rdname svyjdiv
 #' @export
-svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, deff=FALSE , ... ) {
+svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, deff=FALSE , influence = FALSE , ... ) {
 
   # collect income data
   incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -145,6 +145,7 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, deff=FALSE ,
     lin <- lin[pmatch( rownames( design$variables ) , names(lin) ) ]
     lin[ w <= 0] <- 0
   }
+  names( lin ) <- rownames( design$variables )
 
   # compute variance
   variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
@@ -163,6 +164,9 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, deff=FALSE ,
   # keep necessary influence functions
   lin <- lin[ 1/design$prob > 0 ]
 
+  # coerce to matrix
+  lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
   # build result object
   rval <- estimate
   names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -170,6 +174,7 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, deff=FALSE ,
   attr(rval, "var") <- variance
   attr(rval, "statistic") <- "j-divergence"
   attr(rval,"influence") <- lin
+  if ( influence ) attr(rval,"influence") <- lin
   if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
   rval
 
@@ -178,7 +183,7 @@ svyjdiv.survey.design <- function ( formula, design, na.rm = FALSE, deff=FALSE ,
 
 #' @rdname svyjdiv
 #' @export
-svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, deff = FALSE , ... ) {
+svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ... ) {
 
   # collect income data
   incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -227,7 +232,7 @@ svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, deff = FALSE
   colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
   # compute deff
-  if ( is.character(deff) || deff ) {
+  if ( is.character(deff) || deff || influence ) {
 
     # compute influence function
     lin <- CalcJDiv_IF( incvar , ws )
@@ -242,8 +247,10 @@ svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, deff = FALSE
     # filter observation
     names( lin ) <- rownames( design$variables )
 
-  }
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
 
+  }
 
   # build result object
   rval <- estimate
@@ -252,7 +259,18 @@ svyjdiv.svyrep.design <- function ( formula, design, na.rm = FALSE, deff = FALSE
   attr(rval, "var") <- variance
   attr(rval, "statistic") <- "j-divergence"
   if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-  if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
+  if ( influence ) attr( rval , "influence" ) <- lin
+
+  # keep replicates
+  if (return.replicates) {
+    attr( qq , "scale") <- design$scale
+    attr( qq , "rscales") <- design$rscales
+    attr( qq , "mse") <- design$mse
+    rval <- list( mean = rval , replicates = qq )
+    class( rval ) <- c( "cvystat" , "svrepstat" )
+  }
+
+  # return object
   rval
 
 }
@@ -294,15 +312,18 @@ CalcJDiv_IF <-  function( y , w ) {
 
   # compute intermediate statistics
   N <- sum( w )
-  mu <- sum( y * w ) / N
+  Y <- sum( y * w )
+  mu <- Y / N
   jdiv <- sum( w * ( ( y / mu ) - 1 ) * log( y / mu ) ) / N
+  gei1 <- sum( w * (y/mu) * log(y/mu) ) / N
 
   # influence function under fixed mean
   y.score <- ( ( ( y / mu ) - 1 ) * log( y / mu ) )
   lin.fixed <- ( y.score - jdiv ) / N
 
   # derivative wrt mean
-  djdiv.dmu <- - sum( w * ( y/mu^2 ) * y.score ) / N
+  # djdiv.dmu <- 1/mu - sum( w * (y/mu) * ( log( y/mu ) + 1 ) ) / Y
+  djdiv.dmu <- - gei1 / mu
   I.mu <- ( y - mu ) / N
 
   # compute final influence function

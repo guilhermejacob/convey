@@ -9,9 +9,17 @@
 \usage{
 svyjdiv(formula, design, ...)
 
-\method{svyjdiv}{survey.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
+\method{svyjdiv}{survey.design}(formula, design, na.rm = FALSE, deff = FALSE, influence = FALSE, ...)
 
-\method{svyjdiv}{svyrep.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
+\method{svyjdiv}{svyrep.design}(
+  formula,
+  design,
+  na.rm = FALSE,
+  deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
+  ...
+)
 
 \method{svyjdiv}{DBIsvydesign}(formula, design, ...)
 }
