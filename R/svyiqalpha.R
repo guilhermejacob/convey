@@ -125,6 +125,7 @@ svyiqalpha.survey.design <-
       lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
       lin[ w <= 0] <- 0
     }
+    names( lin ) <- rownames( design$variables )
 
     # compute variance
     variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
@@ -200,7 +201,7 @@ svyiqalpha.svyrep.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute influence function
       lin <- CalcQuantile_IF( incvar , ws , alpha )

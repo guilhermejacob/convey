@@ -5,8 +5,7 @@
 #' @export
 svyby.convey.design <-
   function (formula, by, design, FUN, ..., deff = FALSE, keep.var = TRUE,
-            keep.names = TRUE, verbose = FALSE, vartype = c("se", "ci",
-                                                            "ci", "cv", "cvpct", "var"), drop.empty.groups = TRUE,
+            keep.names = TRUE, verbose = FALSE, vartype = c("se", "ci", "ci", "cv", "cvpct", "var"), drop.empty.groups = TRUE,
             covmat = FALSE, influence = covmat, return.replicates = covmat , na.rm.by = FALSE, na.rm.all = FALSE,
             multicore = getOption("survey.multicore")) {
 
@@ -85,20 +84,24 @@ svyby.convey.design <-
 
     }
 
+    # fix vartype
+    if (missing(vartype)) vartype <- "se"
+    # vartype <- match.arg(vartype, several.ok = TRUE)
+
     # remove the "convey.design" and "DBIsvydesign" classes from the current object
     class(design) <- setdiff(class(design), "convey.design")
     class(design) <- setdiff(class(design), "DBIsvydesign")
 
     # branch on survey package function
     if ( as.character( match.call()$FUN ) %in% as.character( lsf.str("package:survey") ) ) {
-      rval <- survey::svyby(formula,by,design, FUN = FUN , ... ,
-                            deff = deff , keep.var = keep.var,
-                            keep.names = keep.names , verbose = verbose ,
-                            vartype = vartype ,
-                            drop.empty.groups = drop.empty.groups ,
-                            covmat = covmat , influence = influence , return.replicates = return.replicates ,
-                            na.rm.by = na.rm.by , na.rm.all = na.rm.all ,
-                            multicore = multicore )
+      rval <- survey::svyby( formula,by,design, FUN = FUN , ... ,
+                             deff = deff , keep.var = keep.var,
+                             keep.names = keep.names , verbose = verbose ,
+                             vartype = vartype ,
+                             drop.empty.groups = drop.empty.groups ,
+                             covmat = covmat , influence = influence , return.replicates = return.replicates ,
+                             na.rm.by = na.rm.by , na.rm.all = na.rm.all ,
+                             multicore = multicore )
       return( rval )
     }
 
@@ -144,16 +147,16 @@ svyby.convey.design <-
           rval
         }
         results <- (if (multicore) parallel::mclapply else lapply)(uniques, function(i) {
-            if (verbose && !multicore) print(as.character(byfactor[i]))
-            if (inherits(formula, "formula")) data <- formula else data <- subset(formula, byfactor %in% byfactor[i])
-            if ( covmat || return.replicates ) {
-              FUN(data, design[byfactor %in% byfactor[i],
-              ], deff = deff, ..., return.replicates = TRUE)
-            } else {
-              FUN(data, design[byfactor %in% byfactor[i],
-              ], deff = deff, ...)
-            }
-          } )
+          if (verbose && !multicore) print(as.character(byfactor[i]))
+          if (inherits(formula, "formula")) data <- formula else data <- subset(formula, byfactor %in% byfactor[i])
+          if ( covmat || return.replicates ) {
+            FUN(data, design[byfactor %in% byfactor[i],
+            ], deff = deff, ..., return.replicates = TRUE)
+          } else {
+            FUN(data, design[byfactor %in% byfactor[i],
+            ], deff = deff, ...)
+          }
+        } )
         rval <- t(sapply(results, unwrap))
         if ((covmat && inherits(design, "svyrep.design")) || return.replicates) {
           replicates <- do.call(cbind, lapply(results, "[[", "replicates"))
@@ -319,7 +322,7 @@ svyby.convey.design <-
           }
           inflmat <- do.call(cbind, inflmats)
           covmat.mat <- svyrecvar( inflmat * weights( attr( design , "full_design" ) , "sampling" ) , attr( design , "full_design" )$cluster,
-                                   attr( design , "full_design" )$strata, attr( design , "full_design" )$fpc, postStrata = design$postStrata)
+                                   attr( design , "full_design" )$strata, attr( design , "full_design" )$fpc, postStrata = attr( design , "full_design" )$postStrata)
         } else {
           covmats <- lapply(results, vcov)
           ncovmat <- sum(sapply(covmats, ncol))
