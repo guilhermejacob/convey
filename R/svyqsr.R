@@ -102,7 +102,7 @@ svyqsr <-
 #' @rdname svyqsr
 #' @export
 svyqsr.survey.design <-
-  function(formula, design, alpha1 = 0.2 , alpha2 = ( 1 - alpha1 ) , na.rm=FALSE, upper_quant = FALSE, lower_quant = FALSE, upper_tot = FALSE, lower_tot = FALSE, deff = FALSE , ...) {
+  function(formula, design, alpha1 = 0.2 , alpha2 = ( 1 - alpha1 ) , na.rm=FALSE, upper_quant = FALSE, lower_quant = FALSE, upper_tot = FALSE, lower_tot = FALSE, deff = FALSE , influence = FALSE , ...) {
 
     # test for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -124,11 +124,11 @@ svyqsr.survey.design <-
     ind <- names(design$prob)
 
     # Linearization of S20
-    S20 <- svyisq(formula = formula, design = design, alpha1, na.rm=na.rm, quantile = TRUE , deff = FALSE )
+    S20 <- svyisq(formula = formula, design = design, alpha1, na.rm=na.rm, quantile = TRUE , deff = FALSE , influence = TRUE )
     qS20 <- attr(S20, "quantile")
     totS20 <- coef(S20)
     attributes(totS20) <- NULL
-    S20 <- list(value= totS20[[1]], lin=attr(S20,"influence"))
+    S20 <- list(value= totS20[[1]], lin=attr(S20,"influence")[,1])
 
     # treat missing
     if ( is.na( totS20 ) ) {
@@ -146,11 +146,11 @@ svyqsr.survey.design <-
     if( S20$value == 0 ) stop( paste0( "division by zero. the alpha1=" , alpha1 , " percentile cannot be zero or svyqsr would return Inf" ) )
 
     # Linearization of S80C
-    S80C <- svyisq( formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE , upper = TRUE , deff = FALSE )
+    S80C <- svyisq( formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE , upper = TRUE , deff = FALSE , influence = TRUE )
     qS80C <- attr(S80C, "quantile")
     totS80C <- coef(S80C)
     attributes(totS80C) <- NULL
-    S80C <- list(value=totS80C[[1]], lin=attr(S80C,"influence"))
+    S80C <- list(value=totS80C[[1]], lin=attr(S80C,"influence")[,1])
 
     # ensure consistent lengths
     if ( length( unique( sapply( lapply( list( S80C , S20 ) , `[[` , "lin" ) , length ) ) ) != 1 ) stop()
@@ -186,6 +186,9 @@ svyqsr.survey.design <-
     lin <- lin[ 1/design$prob > 0 ]
     names( lin ) <- rownames( design$variables )[ w > 0 ]
 
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     rval <- as.numeric( QSR$value )
     attributes( rval ) <- NULL
@@ -193,12 +196,12 @@ svyqsr.survey.design <-
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "qsr"
-    attr(rval, "influence") <- lin
     if(upper_quant)  attr(rval, "upper_quant") <- attr( S80 , "quantile")
     if(lower_quant)  attr(rval, "lower_quant") <- attr( S20 , "quantile")
     if(upper_tot)  attr(rval, "upper_tot") <- TOT$value-totS80
     if(lower_tot)  attr(rval, "lower_tot") <- totS20
     if ( is.character(deff) || deff ) attr(rval,"deff") <- deff.estimate
+    if ( influence ) attr(rval, "influence") <- lin
     rval
 
   }
@@ -206,7 +209,7 @@ svyqsr.survey.design <-
 #' @rdname svyqsr
 #' @export
 svyqsr.svyrep.design <-
-  function(formula, design, alpha1 = 0.2 , alpha2 = ( 1 - alpha1 ) , na.rm=FALSE, upper_quant = FALSE, lower_quant = FALSE, upper_tot = FALSE, lower_tot = FALSE, deff = FALSE , ...) {
+  function(formula, design, alpha1 = 0.2 , alpha2 = ( 1 - alpha1 ) , na.rm=FALSE, upper_quant = FALSE, lower_quant = FALSE, upper_tot = FALSE, lower_tot = FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -275,27 +278,27 @@ svyqsr.svyrep.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # Linearization of S20
-      S20 <- svyisq(formula = formula, design = design, alpha1, na.rm=na.rm, quantile = TRUE , deff = TRUE )
+      S20 <- svyisq(formula = formula, design = design, alpha1, na.rm=na.rm, quantile = TRUE , deff = FALSE , influence = TRUE )
       qS20 <- attr(S20, "quantile")
       totS20 <- coef(S20)
       attributes(totS20) <- NULL
-      S20 <- list(value= totS20[[1]], lin=attr(S20,"influence"))
+      S20 <- list( value= totS20[[1]], lin=attr(S20,"influence")[,1] )
 
       # Linearization of S80C
-      S80C <- svyisq( formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE , upper = TRUE , deff = TRUE )
+      S80C <- svyisq( formula = formula, design = design, alpha2 , na.rm=na.rm , quantile = TRUE , upper = TRUE , deff = FALSE , influence = TRUE )
       qS80C <- attr(S80C, "quantile")
       totS80C <- coef(S80C)
       attributes(totS80C) <- NULL
-      S80C <- list(value=totS80C[[1]], lin=attr(S80C,"influence"))
+      S80C <- list( value=totS80C[[1]], lin=attr(S80C,"influence")[,1] )
 
 
       # linearizatiion of the ratio
       list_all <- list( S20 = S20 , S80C = S80C )
       QSR <- contrastinf( quote( S80C/S20 ) , list_all )
-      lin <- as.numeric( QSR$lin )
+      lin <- as.numeric( QSR$lin[,1] )
       names( lin ) <- rownames( design$variables )
 
       # compute deff
@@ -308,6 +311,9 @@ svyqsr.svyrep.design <-
       # filter observation
       names( lin ) <- rownames( design$variables )
 
+      # coerce to matrix
+      lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # build result object
@@ -316,14 +322,24 @@ svyqsr.svyrep.design <-
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "qsr"
-    attr(rval, "influence") <- NA
     class(rval) <- c( "cvystat" , "svrepstat" )
     if(upper_quant)  attr(rval, "upper_quant") <- Qsr_val[1]
     if(lower_quant)  attr(rval, "lower_quant") <- Qsr_val[2]
     if(upper_tot)  attr(rval, "upper_tot") <- Qsr_val[3]
     if(lower_tot)  attr(rval, "lower_tot") <- Qsr_val[4]
     if ( is.character(deff) || deff ) attr(rval,"deff") <- deff.estimate
-    if ( is.character(deff) || deff ) attr(rval,"influence") <- lin
+    if ( influence ) attr(rval,"influence") <- lin
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- full_design$scale
+      attr( qq , "rscales") <- full_design$rscales
+      attr( qq , "mse") <- full_design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }
