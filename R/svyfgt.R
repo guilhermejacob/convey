@@ -151,7 +151,7 @@ svyfgt <-
 #' @rdname svyfgt
 #' @export
 svyfgt.survey.design <-
-  function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, deff = FALSE , ...){
+  function(formula, design, g, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, deff = FALSE , influence = FALSE , ...){
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -187,9 +187,9 @@ svyfgt.survey.design <-
     # branch on threshold type and its influence function
     if( type_thresh == 'relq' ) {
 
-      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, ...)
+      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, influence = TRUE , ...)
       th <- percent * coef(ARPT)[[1]]
-      arptlin <- percent * attr( ARPT , "influence" )
+      arptlin <- percent * attr( ARPT , "influence" )[,1]
 
     } else if( type_thresh == 'relm') {
 
@@ -266,14 +266,17 @@ svyfgt.survey.design <-
     # keep necessary influence functions
     fgtlin <- fgtlin[ 1/full_design$prob > 0 ]
 
+    # coerce to matrix
+    fgtlin <- matrix( fgtlin , nrow = length( fgtlin ) , dimnames = list( names( fgtlin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # setup result object
     rval <- estimate
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt",g)
-    attr(rval, "influence") <- fgtlin
     if(thresh) attr(rval, "thresh") <- th
+    if ( influence ) attr(rval, "influence") <- fgtlin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
@@ -284,7 +287,7 @@ svyfgt.survey.design <-
 #' @rdname svyfgt
 #' @export
 svyfgt.svyrep.design <-
-  function(formula, design, g, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, deff=FALSE , ...) {
+  function(formula, design, g, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, deff=FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # checked for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -387,7 +390,7 @@ svyfgt.svyrep.design <-
     variance <- survey::svrVar( qq, full_design$scale , full_design$rscales, mse = full_design$mse, coef = rval )
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute threshold influence function on full sample
       # branch on threshold type and its influence function
@@ -428,6 +431,9 @@ svyfgt.svyrep.design <-
       # add indices
       names( fgtlin ) <- rownames( full_design$variables )[ wsf > 0 ]
 
+      # coerce to matrix
+      fgtlin <- matrix( fgtlin , nrow = length( fgtlin ) , dimnames = list( names( fgtlin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # setup result object
@@ -436,8 +442,19 @@ svyfgt.svyrep.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0("fgt",g)
     if(thresh) attr(rval, "thresh") <- th
-    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff) attr( rval , "influence" ) <- fgtlin
+    if ( influence ) attr( rval , "influence" ) <- fgtlin
+    if ( is.character(deff) || deff ) attr( rval , "deff" ) <- deff.estimate
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- full_design$scale
+      attr( qq , "rscales") <- full_design$rscales
+      attr( qq , "mse") <- full_design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }

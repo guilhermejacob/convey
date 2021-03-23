@@ -95,7 +95,7 @@ svyarpr <- function(formula, design, ...) {
 #' @rdname svyarpr
 #' @export
 svyarpr.survey.design <-
-  function(formula, design, quantiles = 0.5, percent = 0.6, na.rm=FALSE, deff = FALSE , ...) {
+  function(formula, design, quantiles = 0.5, percent = 0.6, na.rm=FALSE, deff = FALSE , influence = FALSE , ...) {
 
     # test for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -147,9 +147,9 @@ svyarpr.survey.design <-
     htot <- h_fun( incvec , wf )
 
     # estimate at risk of poverty threshold
-    ARPT <- svyarpt( formula = formula , design = full_design , quantiles = quantiles , percent = percent , na.rm = na.rm , ... )
+    ARPT <- svyarpt( formula = formula , design = full_design , quantiles = quantiles , percent = percent , na.rm = na.rm , influence = TRUE , ... )
     arptv <- coef( ARPT )
-    arptlin <- attr( ARPT , "influence" )
+    arptlin <- attr( ARPT , "influence" )[,1]
 
     # ensure length of linearization vector
     if ( length( arptlin ) != length( full_design$prob ) ) {
@@ -198,12 +198,15 @@ svyarpr.survey.design <-
     # keep necessary influence functions
     arprlin <- arprlin[ 1/full_design$prob > 0 ]
 
+    # coerce to matrix
+    arprlin <- matrix( arprlin , nrow = length( arprlin ) , dimnames = list( names( arprlin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "arpr"
-    attr(rval, "influence") <- arprlin
+    if ( influence ) attr(rval, "influence") <- arprlin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
@@ -214,7 +217,7 @@ svyarpr.survey.design <-
 #' @rdname svyarpr
 #' @export
 svyarpr.svyrep.design <-
-  function(formula, design, quantiles = 0.5, percent = 0.6,na.rm=FALSE, deff =FALSE, ...) {
+  function(formula, design, quantiles = 0.5, percent = 0.6,na.rm=FALSE, deff =FALSE, influence = TRUE , return.replicates = FALSE , ... ) {
 
     # test for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -287,7 +290,7 @@ svyarpr.svyrep.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute linearized threshold
       arptlin <- percent * CalcQuantile_IF( incvec , wsf , quantiles )
@@ -310,6 +313,9 @@ svyarpr.svyrep.design <-
       # filter observation
       names( arprlin ) <- rownames( full_design$variables )
 
+      # coerce to matrix
+      arprlin <- matrix( arprlin , nrow = length( arprlin ) , dimnames = list( names( arprlin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # set up result object
@@ -317,8 +323,19 @@ svyarpr.svyrep.design <-
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "arpr"
-    if ( is.character(deff) || deff) attr(rval,"influence") <- arprlin
+    if ( influence ) attr(rval,"influence") <- arprlin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- full_design$scale
+      attr( qq , "rscales") <- full_design$rscales
+      attr( qq , "mse") <- full_design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }

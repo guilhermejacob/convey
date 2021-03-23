@@ -96,7 +96,7 @@ svyarpt <-
 #' @rdname svyarpt
 #' @export
 svyarpt.survey.design <-
-	function(formula, design, quantiles = 0.5, percent = 0.6,  na.rm = FALSE, deff=FALSE , ...) {
+	function(formula, design, quantiles = 0.5, percent = 0.6,  na.rm = FALSE, deff=FALSE , influence = FALSE , ...) {
 
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
 
@@ -120,9 +120,9 @@ svyarpt.survey.design <-
 		w <- 1/design$prob
 
 		# compute quantile
-		q_alpha <- svyiqalpha( formula, design = design, alpha = quantiles, method = "constant", na.rm = na.rm,...)
+		q_alpha <- svyiqalpha( formula, design = design, alpha = quantiles, method = "constant", na.rm = na.rm , influence = TRUE , ...)
 		rval <- percent * coef( q_alpha )[[1]]
-		lin <- percent * attr( q_alpha , "influence" )
+		lin <- percent * attr( q_alpha , "influence" )[,1]
 
 		# treat out of sample
 		if ( length( lin ) != length( design$prob ) ) {
@@ -130,6 +130,7 @@ svyarpt.survey.design <-
 		  lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
 		  lin[ w <= 0] <- 0
 		}
+		names( lin ) <- rownames( design$variables )
 
 		# compute variance
 		variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
@@ -140,20 +141,22 @@ svyarpt.survey.design <-
 		if ( is.character(deff) || deff) {
 		  nobs <- sum( weights( design ) != 0 )
 		  npop <- sum( weights( design ) )
-		  if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs
-		  else vsrs <- svyvar( lin , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
+		  if (deff == "replace") vsrs <- svyvar( lin , design, na.rm = na.rm) * npop^2/nobs else vsrs <- svyvar( lin , design , na.rm = na.rm ) * npop^2 * (npop - nobs)/(npop * nobs)
 		  deff.estimate <- variance/vsrs
 		}
 
 		# keep necessary influence functions
 		lin <- lin[ 1/design$prob > 0 ]
 
+		# coerce to matrix
+		lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
 		# build result object
 		colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 		class( rval ) <- c( "cvystat" , "svystat" )
 		attr( rval , "var" ) <- variance
 		attr( rval , "statistic" ) <- "arpt"
-		attr( rval , "influence" ) <- lin
+		if ( influence ) attr( rval , "influence" ) <- lin
 		if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
 		rval
 
@@ -162,7 +165,7 @@ svyarpt.survey.design <-
 #' @rdname svyarpt
 #' @export
 svyarpt.svyrep.design <-
-	function(formula, design, quantiles = 0.5, percent = 0.6, na.rm = FALSE, deff=FALSE , ...) {
+	function(formula, design, quantiles = 0.5, percent = 0.6, na.rm = FALSE, deff=FALSE , influence=FALSE , return.replicates = FALSE , ...) {
 
 	  # check for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -208,7 +211,7 @@ svyarpt.svyrep.design <-
 		colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
 		# compute deff
-		if ( is.character(deff) || deff ) {
+		if ( is.character(deff) || deff | influence ) {
 
 		  # compute influence function
 		  lin <- percent * CalcQuantile_IF( incvar , w , quantiles )
@@ -223,6 +226,9 @@ svyarpt.svyrep.design <-
 		  # filter observation
 		  names( lin ) <- rownames( design$variables )
 
+		  # coerce to matrix
+		  lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
 		}
 
 		# build result object
@@ -231,10 +237,20 @@ svyarpt.svyrep.design <-
 		class(rval) <- c( "cvystat" , "svrepstat" )
 		attr(rval, "var") <- variance
 		attr(rval, "statistic") <- "arpt"
+		if ( influence ) attr( rval , "influence" ) <- lin
 		if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-		if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
-		rval
 
+		# keep replicates
+		if (return.replicates) {
+		  attr( qq , "scale") <- design$scale
+		  attr( qq , "rscales") <- design$rscales
+		  attr( qq , "mse") <- design$mse
+		  rval <- list( mean = rval , replicates = qq )
+		  class( rval ) <- c( "cvystat" , "svrepstat" )
+		}
+
+		# return object
+		rval
 	}
 
 #' @rdname svyarpt

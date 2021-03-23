@@ -15,14 +15,14 @@ for ( this.g in c(0,1,2) )  {
 
   # lead data
   data("api")
-
   # set up convey design
-  expect_warning( dstrat1<-convey_prep(svydesign(id=~1,data=apistrat)) )
+  suppressWarnings( dstrat1<-svydesign(id=~1,data=apistrat) )
+  dstrat1<-convey_prep( dstrat1 )
 
   # perform tests
   test_that( paste0( "svyfgt g=", this.g , " works on unweighted designs"), {
-    expect_false( is.na ( coef( svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = "abs" ) ) ) )
-    expect_false( is.na ( SE( svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = "abs" ) ) ) )
+    expect_false( is.na ( coef( svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 7000 , type_thresh = "abs" ) ) ) )
+    expect_false( is.na ( SE( svyfgt( ~api00, design=dstrat1 , g = this.g , abs_thresh = 7000 , type_thresh = "abs" ) ) ) )
   } )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
@@ -40,12 +40,10 @@ for ( this.g in c(0,1,2) )  {
   des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
   # calculate estimates
-  a1 <- svyfgt( ~eqincome , des_eusilc , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  b1 <- svyfgt( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  d1 <- svymean( ~I( ( eqincome <= 7000 ) * ( ( eqincome - 7000 ) / 7000 )^eval(this.g) ) , des_eusilc , deff = TRUE )
-  d2 <- svyby( ~I( ( eqincome <= 7000 ) * ( ( eqincome - 7000 ) / 7000 )^eval(this.g) ) , ~hsize , des_eusilc , svymean , deff = TRUE )
+  a1 <- svyfgt( ~eqincome , des_eusilc , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  b1 <- svyfgt( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -59,10 +57,6 @@ for ( this.g in c(0,1,2) )  {
     expect_is( coef( b2 ) ,"numeric" )
     expect_equal( coef( a1 ) , coef( b1 ) )
     expect_equal( coef( a2 ) , coef( b2 ) )
-    expect_equal( as.numeric( coef( a1 ) ) , abs( as.numeric( coef( d1 ) ) ) )
-    expect_equal( as.numeric( coef( d2 ) ) , as.numeric( coef( d2 ) ) )
-    expect_equal( as.numeric( SE( a1 ) ) , as.numeric( SE( d1 ) ) )
-    expect_equal( as.numeric( SE( d2 ) ) , as.numeric( SE( d2 ) ) )
     # expect_lte( cv_diff1 , coef(a1) * 0.20 )         # the difference between CVs should be less than 5% of the coefficient, otherwise manually set it
     expect_lte( se_diff2 , max( coef(a2) ) * 0.20 )  # the difference between CVs should be less than 10% of the maximum coefficient, otherwise manually set it
     expect_is( SE( a1 ) , "matrix" )
@@ -112,8 +106,8 @@ for ( this.g in c(0,1,2) )  {
     dbd_eusilc <- convey_prep( dbd_eusilc )
 
     # calculate estimates
-    c1 <- svyfgt( ~eqincome , dbd_eusilc , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
+    c1 <- svyfgt( ~eqincome , dbd_eusilc , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
     # remove table and close connection to database
     dbRemoveTable( conn , 'eusilc' )
@@ -126,19 +120,21 @@ for ( this.g in c(0,1,2) )  {
     expect_equal( SE( a2 ) , SE( c2 ) )
     expect_equal( deff( a1 ) , deff( c1 ) )
     expect_equal( deff( a2 ) , deff( c2 ) )
+    expect_equal( vcov( a2 ) , vcov( c2 ) )
 
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+    expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" ) )
 
   } )
 
   ### test 3: compare subsetted objects to svyby objects
 
   # calculate estimates
-  sub_des <- svyfgt( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  sub_rep <- svyfgt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
+  sub_des <- svyfgt( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_rep <- svyfgt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # perform tests
   test_that("subsets equal svyby",{
@@ -217,10 +213,10 @@ for ( this.g in c(0,1,2) )  {
     dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
     # calculate estimates
-    sub_dbd <- svyfgt( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-    sub_dbr <- svyfgt( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
-    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE )
+    sub_dbd <- svyfgt( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
+    sub_dbr <- svyfgt( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE )
+    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyfgt , g = this.g , abs_thresh = 7000 , type_thresh = "abs" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
     # remove table and disconnect from database
     dbRemoveTable( conn , 'eusilc' )
@@ -233,6 +229,8 @@ for ( this.g in c(0,1,2) )  {
     expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
     expect_equal( deff( sub_des ) , deff( sub_dbd ) )
     expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
+    expect_equal( vcov( sby_des ) , vcov( sby_dbd ) )
+    expect_equal( vcov( sby_rep ) , vcov( sby_dbr ) )
 
     # compare database-backed subsetted objects to database-backed svyby objects
     # dbi subsets equal dbi svyby
@@ -246,6 +244,7 @@ for ( this.g in c(0,1,2) )  {
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
     expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
+    expect_equal( attr( sby_des , "influence" ) , attr( sby_dbd , "influence" ) )
 
   } )
 

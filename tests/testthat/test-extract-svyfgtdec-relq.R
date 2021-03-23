@@ -23,16 +23,16 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svyfgtdec( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-b1 <- svyfgtdec( ~eqincome , des_eusilc_rep , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-d1 <- svyfgt( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-d2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-e1 <- svyfgt( ~eqincome , des_eusilc , g = 0 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-e2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 0 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-f1 <- svyfgt( ~eqincome , des_eusilc , g = 1 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-f2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 1 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+a1 <- svyfgtdec( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+b1 <- svyfgtdec( ~eqincome , des_eusilc_rep , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+d1 <- svyfgt( ~eqincome , des_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+d2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+e1 <- svyfgt( ~eqincome , des_eusilc , g = 0 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+e2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 0 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+f1 <- svyfgt( ~eqincome , des_eusilc , g = 1 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+f2 <- svyby( ~eqincome , ~rb090, des_eusilc , svyfgt , g = 1 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ))
@@ -92,8 +92,8 @@ test_that("database svyfgtdec",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svyfgtdec( ~eqincome , dbd_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+  c1 <- svyfgtdec( ~eqincome , dbd_eusilc , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , influence = TRUE , deff = TRUE )
+  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -104,16 +104,17 @@ test_that("database svyfgtdec",{
   expect_equal( coef( a2 ) , coef( c2 )[ match( names( coef( c2 ) ) , names( coef( a2 ) ) ) ] )
   expect_equal( SE( a1 ) , SE( c1 ) )
   expect_equal( SE( a2 ) , SE( c2 )[ 2:1 , ] )
+  expect_equal( attr( a2 , "influence" )[,1:2] , attr( c2 , "influence" )[,2:1] )
 
 } )
 
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyfgtdec( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-sub_rep <- svyfgtdec( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+sub_des <- svyfgtdec( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svyfgtdec( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -134,6 +135,10 @@ test_that("subsets equal svyby",{
   # coefficients of variation should be within five percent
   cv_diff <- max( abs( cv( sub_des ) - cv( sby_rep )[1,] ) )
   expect_lte( cv_diff , .05 )
+
+  # domain vs svyby and svydesign vs svyrepdesign:
+  # influence should match across svydesign
+  expect_equal( as.numeric( attr( sub_des , "influence" )[,1] ) , as.numeric( attr( sby_des , "influence" )[,2] ) )
 
 } )
 
@@ -185,10 +190,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-  sub_dbr <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
-  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" )
+  sub_dbd <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_dbr <- svyfgtdec( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svyfgtdec , g = 2 , percent = 0.6 , quantiles = .5 , type_thresh = "relq" , deff = TRUE , covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -199,6 +204,12 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( coef( sub_rep ) , coef( sub_dbr ) )
   expect_equal( SE( sub_des ) , SE( sub_dbd ) )
   expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
+  expect_equal( deff( sub_des ) , deff( sub_dbd ) )
+  expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
+  expect_equal( vcov( sub_des ) , vcov( sub_dbd ) )
+  expect_equal( vcov( sub_rep ) , vcov( sub_dbr ) )
+  expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
+  expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
 
   # compare database-backed subsetted objects to database-backed svyby objects
   # dbi subsets equal dbi svyby

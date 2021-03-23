@@ -37,10 +37,10 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svyarpt( ~eqincome , des_eusilc , percent = .6 , quantiles = .5 , deff = TRUE )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svyarpt , epsilon =.5 , deff = TRUE )
+a1 <- svyarpt( ~eqincome , des_eusilc , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~rb090, des_eusilc, svyarpt , epsilon =.5 , deff = TRUE , influence = TRUE )
 b1 <- svyarpt( ~eqincome , des_eusilc_rep , percent = .6 , quantiles = .5 , deff = TRUE )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
+b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep, svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -103,8 +103,8 @@ test_that("database svyarpt",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svyarpt( ~ eqincome , dbd_eusilc , percent = .6 , quantiles = .5 , deff = TRUE )
-  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
+  c1 <- svyarpt( ~ eqincome , dbd_eusilc , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~ eqincome , ~rb090 , dbd_eusilc , FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -112,25 +112,25 @@ test_that("database svyarpt",{
 
   # peform tests
   expect_equal( coef( a1 ) , coef( c1 ) )
-  expect_equal( coef( a2 ) , coef( c2 ) )
+  expect_equal( coef( a2 ) , coef( c2[2:1,] ) )
   expect_equal( SE( a1 ) , SE( c1 ) )
-  expect_equal( SE( a2 ) , SE( c2 ) )
+  expect_equal( SE( a2 ) , SE( c2[2:1,] ) )
   expect_equal( deff( a1 ) , deff( c1 ) )
-  expect_equal( deff( a2 ) , deff( c2 ) )
+  expect_equal( deff( a2 ) , deff( c2[2:1,] ) )
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
-  expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" ) )
+  expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" )[,2:1] )
 
 } )
 
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svyarpt( ~eqincome , design = subset( des_eusilc , hsize == 1) , percent = .6 , quantiles = .5 , deff = TRUE )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
-sub_rep <- svyarpt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , percent = .6 , quantiles = .5 , deff = TRUE )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
+sub_des <- svyarpt( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svyarpt( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male") , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , return.replicates = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -208,10 +208,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svyarpt( ~eqincome , design = subset( des_eusilc , hsize == 1) , percent = .6 , quantiles = .5 , deff = TRUE )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
-  sub_dbr <- svyarpt( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , percent = .6 , quantiles = .5 , deff = TRUE )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
+  sub_dbd <- svyarpt( ~eqincome , design = subset( des_eusilc , rb090 == "male") , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_dbr <- svyarpt( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male") , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , return.replicates = TRUE, covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
