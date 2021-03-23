@@ -9,9 +9,17 @@
 \usage{
 svygini(formula, design, ...)
 
-\method{svygini}{survey.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
+\method{svygini}{survey.design}(formula, design, na.rm = FALSE, deff = FALSE, influence = FALSE, ...)
 
-\method{svygini}{svyrep.design}(formula, design, na.rm = FALSE, deff = FALSE, ...)
+\method{svygini}{svyrep.design}(
+  formula,
+  design,
+  na.rm = FALSE,
+  deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
+  ...
+)
 
 \method{svygini}{DBIsvydesign}(formula, design, ...)
 }

@@ -37,10 +37,10 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svygini( ~eqincome , des_eusilc , deff = TRUE )
-a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygini , deff = TRUE )
-b1 <- svygini( ~eqincome , des_eusilc_rep , deff = TRUE )
-b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygini , deff = TRUE )
+a1 <- svygini( ~eqincome , des_eusilc , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~hsize, des_eusilc, svygini , deff = TRUE , influence = TRUE , covmat = TRUE )
+b1 <- svygini( ~eqincome , des_eusilc_rep , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep, svygini , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -103,8 +103,8 @@ test_that("database svygini",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svygini( ~ eqincome , dbd_eusilc , deff = TRUE )
-  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svygini , deff = TRUE )
+  c1 <- svygini( ~ eqincome , dbd_eusilc , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~ eqincome , ~hsize , dbd_eusilc , FUN = svygini , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -120,16 +120,17 @@ test_that("database svygini",{
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+  expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" ) )
 
 } )
 
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svygini( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE )
-sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygini , deff = TRUE )
-sub_rep <- svygini( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE )
-sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygini , deff = TRUE )
+sub_des <- svygini( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygini , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svygini( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE , influence = TRUE  )
+sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygini , deff = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -207,10 +208,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svygini( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE )
-  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygini , deff = TRUE )
-  sub_dbr <- svygini( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE )
-  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygini , deff = TRUE )
+  sub_dbd <- svygini( ~eqincome , design = subset( des_eusilc , hsize == 1) , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svygini , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_dbr <- svygini( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svygini , deff = TRUE , covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -232,6 +233,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
   expect_equal( as.numeric( deff( sub_dbd ) ) , as.numeric( deff( sby_dbd ) )[1] )
   expect_equal( as.numeric( deff( sub_dbr ) ) , as.numeric( deff( sby_dbr ) )[1] )
+  expect_equal( vcov( sby_des ) , vcov( sby_dbd ) )
+  expect_equal( vcov( sby_rep ) , vcov( sby_dbr ) )
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )

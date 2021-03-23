@@ -94,7 +94,7 @@ svygini <-
 #' @rdname svygini
 #' @export
 svygini.survey.design <-
-  function(formula, design, na.rm=FALSE, deff=FALSE , ...) {
+  function( formula , design , na.rm=FALSE , deff=FALSE , influence = FALSE , ... ) {
 
     # collect income data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -139,13 +139,16 @@ svygini.survey.design <-
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
 
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     rval <- estimate
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gini"
-    attr(rval,"influence") <- lin
+    if ( influence ) attr(rval,"influence") <- lin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
     rval
 
@@ -154,7 +157,7 @@ svygini.survey.design <-
 #' @rdname svygini
 #' @export
 svygini.svyrep.design <-
-  function(formula, design, na.rm=FALSE , deff=FALSE , ...) {
+  function( formula , design , na.rm=FALSE , deff=FALSE , influence=FALSE , return.replicates = FALSE , ...) {
 
     # collect data
     df <- model.frame(design)
@@ -190,7 +193,7 @@ svygini.svyrep.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute influence function
       lin <- CalcGini_IF( incvar , ws )
@@ -205,6 +208,9 @@ svygini.svyrep.design <-
       # filter observation
       names( lin ) <- rownames( design$variables )
 
+      # coerce to matrix
+      lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # build result object
@@ -213,8 +219,19 @@ svygini.svyrep.design <-
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "gini"
+    if ( influence ) attr( rval , "influence" ) <- lin
     if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- design$scale
+      attr( qq , "rscales") <- design$rscales
+      attr( qq , "mse") <- design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }
