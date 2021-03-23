@@ -46,10 +46,10 @@ for ( this.g in seq(.25,.75, length.out = 3) )  {
   des_eusilc_rep <- subset( des_eusilc_rep , eqincome > 0 )
 
   # calculate estimates
-  a1 <- svychu( ~eqincome , des_eusilc , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-  b1 <- svychu( ~eqincome , des_eusilc_rep , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
+  a1 <- svychu( ~eqincome , des_eusilc , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  b1 <- svychu( ~eqincome , des_eusilc_rep , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , covmat = TRUE )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -115,8 +115,8 @@ for ( this.g in seq(.25,.75, length.out = 3) )  {
     dbd_eusilc <- subset( dbd_eusilc , eqincome > 0 )
 
     # calculate estimates
-    c1 <- svychu( ~eqincome , dbd_eusilc , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
+    c1 <- svychu( ~eqincome , dbd_eusilc , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
     # remove table and close connection to database
     dbRemoveTable( conn , 'eusilc' )
@@ -129,19 +129,21 @@ for ( this.g in seq(.25,.75, length.out = 3) )  {
     expect_equal( SE( a2 ) , SE( c2 ) )
     expect_equal( deff( a1 ) , deff( c1 ) )
     expect_equal( deff( a2 ) , deff( c2 ) )
+    expect_equal( vcov( a2 ) , vcov( c2 ) )
 
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+    expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" ) )
 
   } )
 
   ### test 3: compare subsetted objects to svyby objects
 
   # calculate estimates
-  sub_des <- svychu( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-  sub_rep <- svychu( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
+  sub_des <- svychu( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_rep <- svychu( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # perform tests
   test_that("subsets equal svyby",{
@@ -224,10 +226,10 @@ for ( this.g in seq(.25,.75, length.out = 3) )  {
     dbd_eusilc_rep <- subset( dbd_eusilc_rep , eqincome > 0 )
 
     # calculate estimates
-    sub_dbd <- svychu( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-    sub_dbr <- svychu( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
-    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE )
+    sub_dbd <- svychu( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
+    sub_dbr <- svychu( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE )
+    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svychu , g = this.g , quantiles = 0.5, percent = 0.6 , type_thresh = "relq" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
     # remove table and disconnect from database
     dbRemoveTable( conn , 'eusilc' )
@@ -240,6 +242,8 @@ for ( this.g in seq(.25,.75, length.out = 3) )  {
     expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
     expect_equal( deff( sub_des ) , deff( sub_dbd ) )
     expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
+    expect_equal( vcov( sub_des ) , vcov( sub_dbd ) )
+    expect_equal( vcov( sub_rep ) , vcov( sub_dbr ) )
 
     # compare database-backed subsetted objects to database-backed svyby objects
     # dbi subsets equal dbi svyby
@@ -253,6 +257,7 @@ for ( this.g in seq(.25,.75, length.out = 3) )  {
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
     expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
+    expect_equal( attr( sby_des , "influence" ) , attr( sby_dbd , "influence" ) )
 
   } )
 
