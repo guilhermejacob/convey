@@ -249,10 +249,10 @@ svyrich.survey.design <-
 
     # ensure length
     if ( length( richlin ) != length( full_design$prob ) ) {
-      names( richlin ) <- rownames( full_design$variables )[ wf > 0 ]
-      richlin <- richlin[ pmatch( rownames( full_design$variables ) , names( richlin ) ) ]
+      tmplin <- rep( 0 , nrow( full_design$variables ) )
+      tmplin[ w > 0 ] <- richlin
+      richlin <- tmplin ; rm( tmplin )
       names( richlin ) <- rownames( full_design$variables )
-      richlin[ is.na( richlin ) ] <- 0
     }
 
     # compute variance

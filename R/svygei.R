@@ -157,13 +157,13 @@ svygei.survey.design <-
     # compute influence functions
     lin <- CalcGEI_IF( x = incvar, weights = w, epsilon = epsilon )
 
-    # treat out of sample
+    # ensure length
     if ( length( lin ) != length( design$prob ) ) {
-      names( lin ) <- rownames( design$variables )[ w > 0 ]
-      lin <- lin[pmatch( rownames( design$variables ) , names(lin) ) ]
-      lin[ w <= 0] <- 0
+      tmplin <- rep( 0 , nrow( design$variables ) )
+      tmplin[ w > 0 ] <- lin
+      lin <- tmplin ; rm( tmplin )
+      names( lin ) <- rownames( design$variables )
     }
-    names( lin ) <- rownames( design$variables )
 
     # compute variance
     variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )

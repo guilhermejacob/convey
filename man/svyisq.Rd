@@ -17,6 +17,7 @@ svyisq(formula, design, ...)
   upper = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -28,6 +29,8 @@ svyisq(formula, design, ...)
   upper = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

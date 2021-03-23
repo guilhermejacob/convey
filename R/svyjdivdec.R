@@ -230,12 +230,16 @@ svyjdivdec.survey.design <-
     estimates <- c( total.jdiv , within.jdiv , between.jdiv )
     names( estimates ) <- c( "total", "within", "between" )
 
-    # treat out of sample
+    # create linearized matrix
     lin.matrix <- matrix( data = c( total.jdivlin , within.jdivlin , between.jdivlin ), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
+    rm( total.jdivlin , within.jdivlin , between.jdivlin )
+
+    # ensure length
     if ( nrow( lin.matrix ) != length( design$prob ) ) {
-      rownames( lin.matrix ) <- rownames( design$variables )[ w > 0 ]
-      lin.matrix <- lin.matrix[ pmatch( rownames( design$variables ) , rownames(lin.matrix ) ) , ]
-      lin.matrix[ w <= 0 , ] <- 0
+      tmplin <- matrix( 0 , nrow = nrow( design$variables ) , ncol = ncol( lin.matrix ) )
+      tmplin[ w > 0 , ] <- lin.matrix
+      lin.matrix <- tmplin ; rm( tmplin )
+      colnames( lin.matrix ) <- c( "total", "within", "between" )
     }
     rownames( lin.matrix ) <- rownames( design$variables )
 

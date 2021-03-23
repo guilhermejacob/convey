@@ -38,16 +38,16 @@ des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
 a1 <- svyarpt( ~eqincome , des_eusilc , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
-a2 <- svyby( ~eqincome , ~rb090, des_eusilc, svyarpt , epsilon =.5 , deff = TRUE , influence = TRUE )
-b1 <- svyarpt( ~eqincome , des_eusilc_rep , percent = .6 , quantiles = .5 , deff = TRUE )
-b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep, svyarpt , percent = .6 , quantiles = .5 , deff = TRUE )
+a2 <- svyby( ~eqincome , ~rb090, des_eusilc, svyarpt , epsilon =.5 , deff = TRUE , influence = TRUE , covmat = TRUE )
+b1 <- svyarpt( ~eqincome , des_eusilc_rep , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep, svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # calculate auxillliary tests statistics
 cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
 se_diff2 <- max( abs( SE( a2 ) - SE( b2 ) ) , na.rm = TRUE )
 
 # perform tests
-test_that( "output svyjdiv" , {
+test_that( "output svyarpt" , {
   expect_is( coef( a1 ) ,"numeric" )
   expect_is( coef( a2 ) , "numeric" )
   expect_is( coef( b1 ) ,"numeric" )
@@ -104,7 +104,7 @@ test_that("database svyarpt",{
 
   # calculate estimates
   c1 <- svyarpt( ~ eqincome , dbd_eusilc , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
-  c2 <- svyby( ~ eqincome , ~rb090 , dbd_eusilc , FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~ eqincome , ~rb090 , dbd_eusilc , FUN = svyarpt , percent = .6 , quantiles = .5 , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -233,9 +233,13 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( as.numeric( SE( sub_dbr ) ) , as.numeric( SE( sby_dbr ) )[1] )
   expect_equal( as.numeric( deff( sub_dbd ) ) , as.numeric( deff( sby_dbd ) )[1] )
   expect_equal( as.numeric( deff( sub_dbr ) ) , as.numeric( deff( sby_dbr ) )[1] )
+  expect_equal( vcov( sby_des ) , vcov( sby_dbd ) )
+  expect_equal( vcov( sby_rep ) , vcov( sby_dbr ) )
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
   expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
+  expect_equal( attr( sby_des , "influence" ) , attr( sby_dbd , "influence" ) )
+  expect_equal( attr( sby_rep , "influence" ) , attr( sby_rep , "influence" ) )
 
 } )

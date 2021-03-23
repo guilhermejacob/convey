@@ -19,6 +19,8 @@ svyfgtdec(formula, design, ...)
   quantiles = 0.5,
   na.rm = FALSE,
   thresh = FALSE,
+  deff = FALSE,
+  influence = TRUE,
   ...
 )
 
@@ -32,6 +34,9 @@ svyfgtdec(formula, design, ...)
   quantiles = 0.5,
   na.rm = FALSE,
   thresh = FALSE,
+  deff = FALSE,
+  influence = TRUE,
+  return.replicates = FALSE,
   ...
 )
 

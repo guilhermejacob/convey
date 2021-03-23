@@ -226,12 +226,16 @@ svygeidec.survey.design <-
     estimates <- c( ttl.gei, wtn.gei, btw.gei )
     names( estimates ) <- c( "total", "within", "between" )
 
-    # treat out of sample
+    # create linearized matrix
     lin.matrix <- matrix( data = c(ttl.lin, within.lin, between.lin), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
+    rm(ttl.lin, within.lin, between.lin)
+
+    # ensure length
     if ( nrow( lin.matrix ) != length( design$prob ) ) {
-      rownames( lin.matrix ) <- rownames( design$variables )[ w > 0 ]
-      lin.matrix <- lin.matrix[ pmatch( rownames( design$variables ) , rownames(lin.matrix ) ) , ]
-      lin.matrix[ w <= 0 , ] <- 0
+      tmplin <- matrix( 0 , nrow = nrow( design$variables ) , ncol = ncol( lin.matrix ) )
+      tmplin[ w > 0 , ] <- lin.matrix
+      lin.matrix <- tmp.lin ; rm( tmplin )
+      colnames( lin.matrix ) <- c( "total", "within", "between" )
     }
     rownames( lin.matrix ) <- rownames( design$variables )
 
@@ -456,13 +460,11 @@ svygeidec.svyrep.design <-
       names( estimates ) <- c( "total", "within", "between" )
 
       # treat out of sample
+
+      # create linearized matrix
       lin.matrix <- matrix( data = c(ttl.lin, within.lin, between.lin), ncol = 3, dimnames = list( NULL, c( "total", "within", "between" ) ) )
-      if ( nrow( lin.matrix ) != length( design$prob ) ) {
-        rownames( lin.matrix ) <- rownames( design$variables )[ ws > 0 ]
-        lin.matrix <- lin.matrix[ pmatch( rownames( design$variables ) , rownames(lin.matrix ) ) , ]
-        lin.matrix[ ws <= 0 , ] <- 0
-      }
       rownames( lin.matrix ) <- rownames( design$variables )
+      rm(ttl.lin, within.lin, between.lin)
 
       ### compute deff
       nobs <- length( design$pweights )

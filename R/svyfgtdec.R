@@ -165,10 +165,13 @@ svyfgtdec.survey.design <-
     lin.matrix <- cbind( fgtg$lin, fgt0$lin, fgt1$lin , igr$lin , gei_poor$lin)
     lin.matrix <- as.matrix( lin.matrix )
     colnames( lin.matrix ) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
+
+    # ensure length
     if ( nrow( lin.matrix ) != length( full_design$prob ) ) {
-      rownames( lin.matrix ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
-      lin.matrix <- lin.matrix[ pmatch( rownames( full_design$variables ) , rownames(lin.matrix ) ) , ]
-      lin.matrix[ 1/full_design$prob <= 0 , ] <- 0
+      tmplin <- matrix( 0 , nrow = nrow( full_design$variables ) , ncol = ncol( lin.matrix ) )
+      tmplin[ w > 0 , ] <- lin.matrix
+      lin.matrix <- tmp.lin ; rm( tmplin )
+      colnames( lin.matrix ) <- c( paste0("fgt",g), "fgt0", "fgt1" , "igr" , paste0( "gei(poor;epsilon=",g,")" ) )
     }
 
     # format objects

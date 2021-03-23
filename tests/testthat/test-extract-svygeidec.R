@@ -9,7 +9,7 @@ library( testthat )
 for ( this.epsilon in c(0,.5,1,2) ) {
 
   # return test context
-  context( paste("gei epsilon=" , this.epsilon , "decomposition output survey.design and svyrep.design" ) )
+  context( paste("svygeidec epsilon=" , this.epsilon , "decomposition output survey.design and svyrep.design" ) )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
 
@@ -70,7 +70,7 @@ for ( this.epsilon in c(0,.5,1,2) ) {
   ### test 2: income data from eusilc --- database-backed design object
 
   # perform tests
-  test_that("database svygei",{
+  test_that("database svygeidec",{
 
     # skip test on cran
     skip_on_cran()

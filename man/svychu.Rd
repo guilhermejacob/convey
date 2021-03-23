@@ -19,7 +19,8 @@ svychu(formula, design, ...)
   quantiles = 0.5,
   thresh = FALSE,
   na.rm = FALSE,
-  deff = TRUE,
+  deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -34,6 +35,8 @@ svychu(formula, design, ...)
   thresh = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

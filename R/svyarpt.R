@@ -124,13 +124,13 @@ svyarpt.survey.design <-
 		rval <- percent * coef( q_alpha )[[1]]
 		lin <- percent * attr( q_alpha , "influence" )[,1]
 
-		# treat out of sample
+		# ensure length
 		if ( length( lin ) != length( design$prob ) ) {
-		  names( lin ) <- rownames( design$variables )[ w > 0 ]
-		  lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
-		  lin[ w <= 0] <- 0
+		  tmplin <- rep( 0 , nrow( design$variables ) )
+		  tmplin[ w > 0 ] <- lin
+		  lin <- tmplin ; rm( tmplin )
+		  names( lin ) <- rownames( design$variables )
 		}
-		names( lin ) <- rownames( design$variables )
 
 		# compute variance
 		variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )

@@ -19,6 +19,7 @@ svywatts(formula, design, ...)
   thresh = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -32,6 +33,8 @@ svywatts(formula, design, ...)
   thresh = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

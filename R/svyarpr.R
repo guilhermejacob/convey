@@ -173,12 +173,12 @@ svyarpr.survey.design <-
     # calculate linearized variable
     arprlin <- arpr1lin + Fprime * arptlin
 
-    # ensure length of linearization vector
+    # ensure length
     if ( length( arprlin ) != length( full_design$prob ) ) {
-      names( arprlin ) <- rownames( full_design$variables )[ 1/full_design$prob > 0 ]
-      arprlin <- arprlin[ pmatch( rownames( full_design$variables ) , names( arprlin ) ) ]
+      tmplin <- rep( 0 , nrow( full_design$variables ) )
+      tmplin[ w > 0 ] <- arprlin
+      arprlin <- tmplin ; rm( tmplin )
       names( arprlin ) <- rownames( full_design$variables )
-      arprlin[ is.na( arprlin ) ] <- 0
     }
 
     # compute variance
@@ -217,7 +217,7 @@ svyarpr.survey.design <-
 #' @rdname svyarpr
 #' @export
 svyarpr.svyrep.design <-
-  function(formula, design, quantiles = 0.5, percent = 0.6,na.rm=FALSE, deff =FALSE, influence = TRUE , return.replicates = FALSE , ... ) {
+  function(formula, design, quantiles = 0.5, percent = 0.6,na.rm=FALSE, deff =FALSE, influence = FALSE , return.replicates = FALSE , ... ) {
 
     # test for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")

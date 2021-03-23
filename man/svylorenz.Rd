@@ -21,6 +21,7 @@ svylorenz(formula, design, ...)
   alpha = 0.05,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -36,6 +37,8 @@ svylorenz(formula, design, ...)
   alpha = 0.05,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

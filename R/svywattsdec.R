@@ -178,11 +178,12 @@ svywattsdec.survey.design <-
     wf <- 1/full_design$prob
     wf[ !( names( wf ) %in% rownames( lin.matrix ) ) ] <- 0
 
-    # treat out of sample
+    # ensure length
     if ( nrow( lin.matrix ) != length( full_design$prob ) ) {
-      rownames( lin.matrix ) <- rownames( full_design$variables )[ wf > 0 ]
-      lin.matrix <- lin.matrix[ pmatch( rownames( full_design$variables ) , rownames(lin.matrix ) ) , ]
-      lin.matrix[ w <= 0 , ] <- 0
+      tmplin <- matrix( 0 , nrow = nrow( full_design$variables ) , ncol = ncol( lin.matrix ) )
+      tmplin[ wf > 0 , ] <- lin.matrix
+      lin.matrix <- tmp.lin ; rm( tmplin )
+      colnames( lin.matrix ) <- c( "watts", "fgt0", "watts pov. gap ratio" , "theil(poor)" )
     }
 
     # compute variance

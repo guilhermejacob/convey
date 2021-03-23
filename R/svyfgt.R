@@ -243,10 +243,10 @@ svyfgt.survey.design <-
 
     # ensure length
     if ( length( fgtlin ) != length( full_design$prob ) ) {
-      names( fgtlin ) <- rownames( full_design$variables )[ wf > 0 ]
-      fgtlin <- fgtlin[ pmatch( rownames( full_design$variables ) , names( fgtlin ) ) ]
+      tmplin <- rep( 0 , nrow( full_design$variables ) )
+      tmplin[ w > 0 ] <- fgtlin
+      fgtlin <- tmplin ; rm( tmplin )
       names( fgtlin ) <- rownames( full_design$variables )
-      fgtlin[ is.na( fgtlin ) ] <- 0
     }
 
     # compute variance

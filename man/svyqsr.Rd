@@ -20,6 +20,7 @@ svyqsr(formula, design, ...)
   upper_tot = FALSE,
   lower_tot = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -34,6 +35,8 @@ svyqsr(formula, design, ...)
   upper_tot = FALSE,
   lower_tot = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

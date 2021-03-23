@@ -229,10 +229,10 @@ svychu.survey.design <-
 
     # ensure length
     if ( length( chulin ) != length( full_design$prob ) ) {
-      names( chulin ) <- rownames( full_design$variables )[ wf > 0 ]
-      chulin <- chulin[ pmatch( rownames( full_design$variables ) , names( chulin ) ) ]
+      tmplin <- rep( 0 , nrow( full_design$variables ) )
+      tmplin[ w > 0 ] <- chulin
+      chulin <- tmplin ; rm( tmplin )
       names( chulin ) <- rownames( full_design$variables )
-      chulin[ is.na( chulin ) ] <- 0
     }
 
     # compute variance

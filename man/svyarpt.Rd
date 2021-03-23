@@ -16,6 +16,7 @@ svyarpt(formula, design, ...)
   percent = 0.6,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -26,6 +27,8 @@ svyarpt(formula, design, ...)
   percent = 0.6,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

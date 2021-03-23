@@ -21,6 +21,7 @@ svyrich(formula, design, ...)
   thresh = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -36,6 +37,8 @@ svyrich(formula, design, ...)
   thresh = FALSE,
   na.rm = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 

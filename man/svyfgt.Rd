@@ -20,6 +20,7 @@ svyfgt(formula, design, ...)
   na.rm = FALSE,
   thresh = FALSE,
   deff = FALSE,
+  influence = FALSE,
   ...
 )
 
@@ -34,6 +35,8 @@ svyfgt(formula, design, ...)
   na.rm = FALSE,
   thresh = FALSE,
   deff = FALSE,
+  influence = FALSE,
+  return.replicates = FALSE,
   ...
 )
 
