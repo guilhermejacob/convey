@@ -182,18 +182,18 @@ svypoormed.survey.design <-
     # compute at risk of poverty rate
     ARPR <- svyarpr( formula=formula, design= design, quantiles, percent, na.rm = na.rm )
     arpr <- coef( ARPR )
-    ifarpr <- attr( ARPR, "influence" )
+    ifarpr <- attr( ARPR, "influence" )[,1]
 
-    # treat out of sample
+    # ensure length
     if ( length( ifarpr ) != length( full_design$prob ) ) {
-      names( ifarpr ) <- rownames( design$variables )[ w > 0 ]
-      ifarpr <- ifarpr[ pmatch( rownames( full_design$variables ) , names(ifarpr) ) ]
+      tmplin <- rep( 0 , nrow( full_design$variables ) )
+      tmplin[ rownames( full_design$variables ) %in% names( ifarpr ) ] <- ifarpr
+      ifarpr <- tmplin ; rm( tmplin )
       names( ifarpr ) <- rownames( full_design$variables )
-      ifarpr[ is.na( ifarpr ) ] <- 0
     }
 
     # compute density
-    Fprimemedp <- densfun(formula = formula, design = design, medp, h = htot, FUN = "F", na.rm = na.rm)
+    Fprimemedp <- densfun(formula = formula, design = design, medp, h = htot, FUN = "F", na.rm = na.rm )
 
     # linearize cdf of medp
     ifmedp <- ( 1 / N ) * ID * ( ( incvec <= medp ) - 0.5 * arpr )
@@ -203,10 +203,10 @@ svypoormed.survey.design <-
 
     # ensure length
     if ( length( linmedp ) != length( full_design$prob ) ) {
-      names( linmedp ) <- rownames( design$variables )[ w > 0 ]
-      linmedp <- linmedp[ pmatch( rownames( full_design$variables ) , names( linmedp ) ) ]
+      tmplin <- rep( 0 , nrow( full_design$variables ) )
+      tmplin[ rownames( full_design$variables ) %in% names( linmedp ) ] <- linmedp
+      linmedp <- tmplin ; rm( tmplin )
       names( linmedp ) <- rownames( full_design$variables )
-      linmedp[ is.na( linmedp ) ] <- 0
     }
 
     # computte variance
@@ -219,7 +219,6 @@ svypoormed.survey.design <-
     rval <- medp
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     attr( rval , "var" ) <- variance
-    attr(rval, "influence") <- linmedp
     attr( rval , "statistic" ) <- "poormed"
     class(rval) <- c( "cvystat" , "svystat" )
     rval

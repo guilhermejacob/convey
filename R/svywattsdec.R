@@ -129,7 +129,7 @@ svywattsdec <-
 #' @rdname svywattsdec
 #' @export
 svywattsdec.survey.design <-
-  function(formula, design, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE, ...){
+  function(formula, design, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, na.rm = FALSE, thresh = FALSE , ...){
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -149,18 +149,18 @@ svywattsdec.survey.design <-
     if ("logical" %in% class(attr(design, "full_design"))) full_design <- design else full_design <- attr(design, "full_design")
 
     # compute poverty measures
-    watts <- svywatts( formula=formula , design=design , type_thresh=type_thresh , percent=percent , quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh=thresh )
-    fgt0 <- svyfgt( formula=formula , design=design , g = 0 , type_thresh=type_thresh , percent=percent , quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh=thresh )
-    fgt1 <- svyfgt( formula=formula , design=design , g = 1 , type_thresh=type_thresh , percent=percent , quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh=thresh )
+    watts <- svywatts( formula=formula , design=design , type_thresh=type_thresh , percent=percent , quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh=thresh , influence = TRUE )
+    fgt0 <- svyfgt( formula=formula , design=design , g = 0 , type_thresh=type_thresh , percent=percent , quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh=thresh , influence = TRUE )
+    fgt1 <- svyfgt( formula=formula , design=design , g = 1 , type_thresh=type_thresh , percent=percent , quantiles=quantiles , abs_thresh=abs_thresh , na.rm=na.rm , thresh=thresh , influence = TRUE )
 
     # Watts Poverty Gap Ratio
-    fgt0 <- list( value = coef( fgt0 )[[1]] , lin = attr( fgt0 , "influence" ) )
-    fgt1 <- list( value = coef( fgt1 )[[1]] , lin = attr( fgt1 , "influence" ) )
+    fgt0 <- list( value = coef( fgt0 )[[1]] , lin = attr( fgt0 , "influence" )[,1] )
+    fgt1 <- list( value = coef( fgt1 )[[1]] , lin = attr( fgt1 , "influence" )[,1] )
     W_pgr <- convey::contrastinf( quote( log( fgt0/(fgt0 - fgt1 ) ) ) , list( fgt0 = fgt0 , fgt1 = fgt1 ) )
 
     # Theil inequality index of incomes among the poor
     # by residual
-    watts <- list( value = coef( watts )[[1]] , lin = attr( watts , "influence" ) )
+    watts <- list( value = coef( watts )[[1]] , lin = attr( watts , "influence" )[,1] )
     L_poor <- convey::contrastinf( quote( watts/fgt0 - W_pgr ) , list( watts = watts , fgt0 = fgt0 , W_pgr = W_pgr ) )
     L_poor$lin <- as.numeric( L_poor$lin )
     names( L_poor$lin ) <- names( watts$lin )
@@ -182,7 +182,7 @@ svywattsdec.survey.design <-
     if ( nrow( lin.matrix ) != length( full_design$prob ) ) {
       tmplin <- matrix( 0 , nrow = nrow( full_design$variables ) , ncol = ncol( lin.matrix ) )
       tmplin[ wf > 0 , ] <- lin.matrix
-      lin.matrix <- tmp.lin ; rm( tmplin )
+      lin.matrix <- tmplin ; rm( tmplin )
       colnames( lin.matrix ) <- c( "watts", "fgt0", "watts pov. gap ratio" , "theil(poor)" )
     }
 

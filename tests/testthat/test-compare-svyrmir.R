@@ -34,8 +34,8 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates using convey
-fun_rmirw <- svyrmir( ~eqincome , des_eusilc , age = ~age , agelim = 65 )
-fun_rmirw_rep <- svyrmir( ~eqincome , des_eusilc_rep , age = ~age , agelim = 65 )
+fun_rmirw <- svyrmir( ~eqincome , des_eusilc , age = ~age , agelim = 65 , influence = TRUE )
+fun_rmirw_rep <- svyrmir( ~eqincome , des_eusilc_rep , age = ~age , agelim = 65 , influence = TRUE )
 
 # collect point estimates from convey object
 convest <- coef( fun_rmirw )
@@ -76,7 +76,7 @@ attributes( varsed ) <- NULL
 ### using convey
 
 # calculate estimates
-fun_rmird <- svyby( ~eqincome , ~hsize , des_eusilc , svyrmir , age = ~age , agelim = 65 )
+fun_rmird <- svyby( ~eqincome , ~hsize , des_eusilc , svyrmir , age = ~age , agelim = 65 , influence = TRUE )
 
 # collect point estimates
 convestd <- coef( fun_rmird )

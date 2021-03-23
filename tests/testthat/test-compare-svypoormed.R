@@ -35,8 +35,8 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates using convey
-fun_poormedw <- svypoormed( ~eqincome , des_eusilc, 0.5 , 0.6 )
-fun_poormedw_rep <- svypoormed( ~eqincome , des_eusilc_rep, 0.5 , 0.6 )
+fun_poormedw <- svypoormed( ~eqincome , des_eusilc, 0.5 , 0.6 , influence = TRUE )
+fun_poormedw_rep <- svypoormed( ~eqincome , des_eusilc_rep, 0.5 , 0.6 , influence = TRUE )
 
 # collect point estimates from convey object
 convest <- coef( fun_poormedw )
