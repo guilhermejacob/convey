@@ -155,7 +155,7 @@ svylorenzpolygon_wrap <-
 
 #' @rdname svylorenz
 #' @export
-svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1), empirical = FALSE, plot = TRUE, add = FALSE, curve.col = "red", ci = TRUE, alpha = .05, na.rm = FALSE , deff = FALSE , ... ) {
+svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1), empirical = FALSE, plot = TRUE, add = FALSE, curve.col = "red", ci = TRUE, alpha = .05, na.rm = FALSE , deff = FALSE , influence = FALSE , ... ) {
 
   # collect income data
   incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -203,7 +203,7 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
   # compute variance
   variance <- survey::svyrecvar( sweep( lin.matrix , 1 , 1/design$prob , "*" ) , design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
   variance[ which( is.nan( variance ) ) ] <- NA
-  rownames( variance ) <- colnames( variance ) <- quantiles
+  rownames( variance ) <- colnames( variance ) <- paste0( "L(" , quantiles , ")" )
   se <- sqrt( diag( variance ) )
 
   # compute deff
@@ -218,6 +218,7 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
   # keep necessary influence functions
   lin.matrix <- lin.matrix[ 1/design$prob > 0 , ]
   rownames( lin.matrix ) <- rownames( design$variables )[ w > 0 ]
+  colnames( lin.matrix ) <- paste0( "L(" , quantiles , ")" )
 
   # compute CIs
   CI.L <- L.p - se * qnorm( alpha , mean = 0, sd = 1, lower.tail = FALSE )
@@ -226,12 +227,12 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
 
   # build result object
   rval <- c( L.p )
-  names( rval ) <- quantiles
+  names( rval ) <- paste0( "L(" , quantiles , ")" )
   attr( rval , "var") <- variance
   attr( rval , "statistic") <- "lorenz"
   class( rval ) <- c( "cvystat" , "svystat" )
   if ( is.character(deff) || deff ) attr(rval,"deff") <- deff.estimate
-  if ( is.character(deff) || deff ) attr(rval,"influence") <- lin.matrix
+  if ( influence ) attr(rval,"influence") <- lin.matrix
 
   # calculate empirical curve
   if (empirical) empirical.lorenz <- emp.interp( incvar , w )
@@ -294,7 +295,7 @@ svylorenz.survey.design <- function ( formula , design, quantiles = seq(0,1,.1),
 
 #' @rdname svylorenz
 #' @export
-svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), empirical = FALSE, plot = TRUE, add = FALSE, curve.col = "red", ci = TRUE, alpha = .05, na.rm = FALSE , deff = FALSE , ...) {
+svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), empirical = FALSE, plot = TRUE, add = FALSE, curve.col = "red", ci = TRUE, alpha = .05, na.rm = FALSE , deff = FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
   # collect income data
   incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -341,7 +342,7 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     return(rval)
   }
   variance <- survey::svrVar( qq, design$scale, design$rscales, mse = design$mse, coef = rval )
-  rownames( variance ) <- colnames( variance ) <- quantiles
+  rownames( variance ) <- colnames( variance ) <- paste0( "L(" , quantiles , ")" )
 
   # set up additional estimates
   se <- sqrt(diag(variance))
@@ -352,6 +353,10 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     # compute linearized
     lin.matrix<- do.call( cbind , lapply( quantiles, function( z ) CalcLorenz_IF( incvar, ws , z ) ) )
 
+    # add names
+    rownames( lin.matrix ) <- rownames( design$variables )
+    colnames( lin.matrix ) <- paste0( "L(" , quantiles , ")" )
+
     # compute deff
     nobs <- length( design$pweights )
     npop <- sum( design$pweights )
@@ -359,8 +364,6 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
     if (deff != "replace") vsrs <- vsrs * (npop - nobs)/npop
     deff.estimate <- diag( variance ) / vsrs
 
-    # filter observation
-    rownames( lin.matrix ) <- rownames( design$variables )
 
   }
 
@@ -371,12 +374,12 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
 
   # set up result object
   rval <- c( L.p )
-  names( rval ) <- quantiles
+  names( rval ) <- paste0( "L(" , quantiles , ")" )
   attr( rval , "var") <- variance
   attr( rval , "statistic") <- "lorenz"
   class( rval ) <- c( "cvystat" , "svrepstat" )
   if ( is.character(deff) || deff ) attr(rval,"deff") <- deff.estimate
-  if ( is.character(deff) || deff ) attr(rval,"influence") <- lin.matrix
+  if ( influence ) attr(rval,"influence") <- lin.matrix
 
   # empirical curve
   if (empirical) empirical.lorenz <- emp.interp( incvar , ws )
@@ -429,6 +432,15 @@ svylorenz.svyrep.design <- function(formula , design, quantiles = seq(0,1,.1), e
 
     }
 
+  }
+
+  # keep replicates
+  if (return.replicates) {
+    attr( qq , "scale") <- design$scale
+    attr( qq , "rscales") <- design$rscales
+    attr( qq , "mse") <- design$mse
+    rval <- list( mean = rval , replicates = qq )
+    class( rval ) <- c( "cvystat" , "svrepstat" )
   }
 
   # return final result object

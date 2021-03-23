@@ -23,10 +23,10 @@ des_eusilc <- convey_prep( des_eusilc )
 des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
 # calculate estimates
-a1 <- svylorenz( ~eqincome , des_eusilc , deff = TRUE )
-a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svylorenz , deff = TRUE )
-b1 <- svylorenz( ~eqincome , des_eusilc_rep , deff = TRUE )
-b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svylorenz , deff = TRUE )
+a1 <- svylorenz( ~eqincome , des_eusilc , deff = TRUE , influence = TRUE )
+a2 <- svyby( ~eqincome , ~rb090, des_eusilc , svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
+b1 <- svylorenz( ~eqincome , des_eusilc_rep , deff = TRUE , influence = TRUE )
+b2 <- svyby( ~eqincome , ~rb090, des_eusilc_rep , svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # calculate auxillliary tests statistics
 # cv_diff1 <- max( abs( cv( a1 ) - cv( b1 ) ))
@@ -77,8 +77,8 @@ test_that("database svylorenz",{
   dbd_eusilc <- convey_prep( dbd_eusilc )
 
   # calculate estimates
-  c1 <- svylorenz( ~eqincome , dbd_eusilc , deff = TRUE )
-  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svylorenz , deff = TRUE )
+  c1 <- svylorenz( ~eqincome , dbd_eusilc , deff = TRUE , influence = TRUE )
+  c2 <- svyby( ~eqincome , ~rb090, dbd_eusilc , svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and close connection to database
   dbRemoveTable( conn , 'eusilc' )
@@ -91,6 +91,7 @@ test_that("database svylorenz",{
   expect_equal( SE( a2 ) , SE( c2[2:1,] ) )
   expect_equal( deff( a1 ) , deff( c1 ) )
   expect_equal( deff( a2 ) , deff( c2[2:1,] ) )
+  expect_equal( vcov( a1 ) , vcov( c1 ) )
 
   # compare influence functions across data.frame and dbi backed survey design objects
   expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
@@ -100,10 +101,10 @@ test_that("database svylorenz",{
 ### test 3: compare subsetted objects to svyby objects
 
 # calculate estimates
-sub_des <- svylorenz( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , deff = TRUE )
-sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svylorenz , deff = TRUE )
-sub_rep <- svylorenz( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , deff = TRUE )
-sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svylorenz , deff = TRUE )
+sub_des <- svylorenz( ~eqincome , design = subset( des_eusilc , rb090 == "male" ) , deff = TRUE , influence = TRUE )
+sby_des <- svyby( ~eqincome, by = ~rb090, design = des_eusilc, FUN = svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
+sub_rep <- svylorenz( ~eqincome , design = subset( des_eusilc_rep , rb090 == "male" ) , deff = TRUE , influence = TRUE )
+sby_rep <- svyby( ~eqincome, by = ~rb090, design = des_eusilc_rep, FUN = svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
 
 # perform tests
 test_that("subsets equal svyby",{
@@ -182,10 +183,10 @@ test_that("dbi subsets equal non-dbi subsets",{
   dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
   # calculate estimates
-  sub_dbd <- svylorenz( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , deff = TRUE )
-  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svylorenz , deff = TRUE )
-  sub_dbr <- svylorenz( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , deff = TRUE )
-  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svylorenz , deff = TRUE )
+  sub_dbd <- svylorenz( ~eqincome , design = subset( dbd_eusilc , rb090 == "male" ) , deff = TRUE , influence = TRUE )
+  sby_dbd <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc, FUN = svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_dbr <- svylorenz( ~eqincome , design = subset( dbd_eusilc_rep , rb090 == "male" ) , deff = TRUE , influence = TRUE )
+  sby_dbr <- svyby( ~eqincome, by = ~rb090, design = dbd_eusilc_rep, FUN = svylorenz , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # remove table and disconnect from database
   dbRemoveTable( conn , 'eusilc' )
@@ -198,6 +199,8 @@ test_that("dbi subsets equal non-dbi subsets",{
   expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
   expect_equal( deff( sub_des ) , deff( sub_dbd ) )
   expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
+  expect_equal( vcov( sub_des ) , vcov( sub_dbd ) )
+  expect_equal( vcov( sub_rep ) , vcov( sub_dbr ) )
 
   # compare database-backed subsetted objects to database-backed svyby objects
   # dbi subsets equal dbi svyby
