@@ -138,7 +138,7 @@ svyatk <-
 #' @rdname svyatk
 #' @export
 svyatk.survey.design <-
-  function ( formula, design, epsilon = 1, na.rm = FALSE, deff = FALSE , ... ) {
+  function ( formula, design, epsilon = 1, na.rm = FALSE, deff = FALSE , influence = FALSE , ... ) {
 
     # collect data
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -188,6 +188,9 @@ svyatk.survey.design <-
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
 
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     rval <- estimate
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
@@ -195,8 +198,8 @@ svyatk.survey.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "atkinson"
     attr(rval,"epsilon")<- epsilon
-    attr(rval,"influence") <- lin
     if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
+    if ( influence ) attr(rval,"influence") <- lin
     rval
 
 
@@ -206,7 +209,7 @@ svyatk.survey.design <-
 #' @rdname svyatk
 #' @export
 svyatk.svyrep.design <-
-  function(formula, design, epsilon = 1, na.rm=FALSE, deff = FALSE , ...) {
+  function(formula, design, epsilon = 1, na.rm=FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # collect income variable
     incvar <- model.frame(formula, design$variables, na.action = na.pass)[[1]]
@@ -244,7 +247,7 @@ svyatk.svyrep.design <-
     colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute influence function
       lin <- CalcAtk_IF( incvar , ws , epsilon )
@@ -259,6 +262,9 @@ svyatk.svyrep.design <-
       # filter observation
       names( lin ) <- rownames( design$variables )
 
+      # coerce to matrix
+      lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # build result object
@@ -268,8 +274,19 @@ svyatk.svyrep.design <-
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "atkinson"
     attr(rval,"epsilon") <- epsilon
-    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff) attr( rval , "influence" ) <- lin
+    if ( is.character(deff) || deff ) attr( rval , "deff" ) <- deff.estimate
+    if ( influence ) attr( rval , "influence" ) <- lin
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- design$scale
+      attr( qq , "rscales") <- design$rscales
+      attr( qq , "mse") <- design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }
