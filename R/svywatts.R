@@ -130,7 +130,7 @@ svywatts <-
 #' @rdname svywatts
 #' @export
 svywatts.survey.design <-
-  function(formula, design, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, thresh = FALSE, na.rm = FALSE, deff = FALSE , ...){
+  function(formula, design, type_thresh="abs",  abs_thresh=NULL, percent = .60, quantiles = .50, thresh = FALSE, na.rm = FALSE, deff = FALSE , influence = FALSE , ...){
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -166,9 +166,9 @@ svywatts.survey.design <-
     # branch on threshold type and its influence function
     if( type_thresh == 'relq' ) {
 
-      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, ...)
+      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, influence = TRUE , ...)
       th <- percent * coef(ARPT)[[1]]
-      arptlin <- percent * attr( ARPT , "influence" )
+      arptlin <- percent * attr( ARPT , "influence" )[,1]
 
     } else if( type_thresh == 'relm') {
 
@@ -249,15 +249,18 @@ svywatts.survey.design <-
     # keep necessary influence functions
     wattslin <- wattslin[ 1/full_design$prob > 0 ]
 
+    # coerce to matrix
+    wattslin <- matrix( wattslin , nrow = length( wattslin ) , dimnames = list( names( wattslin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # setup result object
     rval <- estimate
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "watts"
-    attr(rval, "influence") <- wattslin
     if(thresh) attr(rval, "thresh") <- th
-    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
+    if ( is.character(deff) || deff ) attr( rval , "deff") <- deff.estimate
+    if ( influence ) attr(rval, "influence") <- wattslin
     rval
 
   }
@@ -267,7 +270,7 @@ svywatts.survey.design <-
 #' @rdname svywatts
 #' @export
 svywatts.svyrep.design <-
-  function(formula, design, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, thresh = FALSE, na.rm = FALSE, deff = FALSE , ...) {
+  function(formula, design, type_thresh="abs", abs_thresh=NULL, percent = .60, quantiles = .50, thresh = FALSE, na.rm = FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # checked for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -370,7 +373,7 @@ svywatts.svyrep.design <-
     variance <- survey::svrVar( qq, full_design$scale , full_design$rscales, mse = full_design$mse, coef = rval )
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute threshold influence function on full sample
       # branch on threshold type and its influence function
@@ -412,6 +415,9 @@ svywatts.svyrep.design <-
       # add indices
       names( wattslin ) <- rownames( full_design$variables )[ wsf > 0 ]
 
+      # coerce to matrix
+      wattslin <- matrix( wattslin , nrow = length( wattslin ) , dimnames = list( names( wattslin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # setup result object
@@ -419,11 +425,21 @@ svywatts.svyrep.design <-
     class(rval) <- c( "cvystat" , "svrepstat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- "watts"
-    if(thresh) attr(rval, "thresh") <- th
-    if ( is.character(deff) || deff) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff) attr( rval , "influence" ) <- wattslin
-    rval
+    if ( thresh ) attr(rval, "thresh") <- th
+    if ( is.character(deff) || deff ) attr( rval , "deff" ) <- deff.estimate
+    if ( influence ) attr( rval , "influence" ) <- wattslin
 
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- full_design$scale
+      attr( qq , "rscales") <- full_design$rscales
+      attr( qq , "mse") <- full_design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
+    rval
 
   }
 
