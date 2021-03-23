@@ -21,8 +21,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
 
   # perform tests
   test_that( paste0( "svyrich g=", this.g , " works on unweighted designs"), {
-    expect_false( is.na ( coef( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE ) ) ) )
-    expect_false( is.na ( SE( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE ) ) ) )
+    expect_false( is.na ( coef( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE ) ) ) )
+    expect_false( is.na ( SE( svyrich( ~api00, design=dstrat1 , g = this.g , abs_thresh = 600 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE ) ) ) )
   } )
 
   ### test 2: income data from eusilc --- data.frame-backed design object
@@ -40,10 +40,10 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
   des_eusilc_rep <- convey_prep( des_eusilc_rep )
 
   # calculate estimates
-  a1 <- svyrich( ~eqincome , des_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-  b1 <- svyrich( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
+  a1 <- svyrich( ~eqincome , des_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+  a2 <- svyby( ~eqincome , ~hsize, des_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  b1 <- svyrich( ~eqincome , des_eusilc_rep , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+  b2 <- svyby( ~eqincome , ~hsize, des_eusilc_rep , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # calculate auxillliary tests statistics
   cv_diff1 <- abs( cv( a1 ) - cv( b1 ) )
@@ -106,8 +106,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
     dbd_eusilc <- convey_prep( dbd_eusilc )
 
     # calculate estimates
-    c1 <- svyrich( ~eqincome , dbd_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
+    c1 <- svyrich( ~eqincome , dbd_eusilc , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+    c2 <- svyby( ~eqincome , ~hsize, dbd_eusilc , svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , comvat = TRUE )
 
     # remove table and close connection to database
     dbRemoveTable( conn , 'eusilc' )
@@ -123,16 +123,17 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
 
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( a1 , "influence" ) , attr( c1 , "influence" ) )
+    expect_equal( attr( a2 , "influence" ) , attr( c2 , "influence" ) )
 
   } )
 
   ### test 3: compare subsetted objects to svyby objects
 
   # calculate estimates
-  sub_des <- svyrich( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-  sub_rep <- svyrich( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
+  sub_des <- svyrich( ~eqincome , design = subset( des_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+  sby_des <- svyby( ~eqincome, by = ~hsize, design = des_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , covmat = TRUE )
+  sub_rep <- svyrich( ~eqincome , design = subset( des_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+  sby_rep <- svyby( ~eqincome, by = ~hsize, design = des_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
   # perform tests
   test_that("subsets equal svyby",{
@@ -211,10 +212,10 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
     dbd_eusilc_rep <- convey_prep( dbd_eusilc_rep )
 
     # calculate estimates
-    sub_dbd <- svyrich( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-    sub_dbr <- svyrich( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
-    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE )
+    sub_dbd <- svyrich( ~eqincome , design = subset( dbd_eusilc , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+    sby_dbd <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , covmat = TRUE )
+    sub_dbr <- svyrich( ~eqincome , design = subset( dbd_eusilc_rep , hsize == 1) , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE )
+    sby_dbr <- svyby( ~eqincome, by = ~hsize, design = dbd_eusilc_rep, FUN = svyrich , g = this.g , abs_thresh = 20000 , type_thresh = this.threshold , type_measure = "FGTT1" , deff = TRUE , influence = TRUE , covmat = TRUE )
 
     # remove table and disconnect from database
     dbRemoveTable( conn , 'eusilc' )
@@ -227,6 +228,8 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
     expect_equal( SE( sub_rep ) , SE( sub_dbr ) )
     expect_equal( deff( sub_des ) , deff( sub_dbd ) )
     expect_equal( deff( sub_rep ) , deff( sub_dbr ) )
+    expect_equal( vcov( sby_des ) , vcov( sby_dbd ) )
+    expect_equal( vcov( sby_rep ) , vcov( sby_dbr ) )
 
     # compare database-backed subsetted objects to database-backed svyby objects
     # dbi subsets equal dbi svyby
@@ -240,6 +243,7 @@ for ( this.threshold in c( "abs", "relq","relm") ) for ( this.g in c(0,1) )  {
     # compare influence functions across data.frame and dbi backed survey design objects
     expect_equal( attr( sub_des , "influence" ) , attr( sub_dbd , "influence" ) )
     expect_equal( attr( sub_rep , "influence" ) , attr( sub_dbr , "influence" ) )
+    expect_equal( attr( sby_des , "influence" ) , attr( sby_dbd , "influence" ) )
 
   } )
 

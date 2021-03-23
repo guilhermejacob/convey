@@ -151,7 +151,7 @@ svyrich <-
 #' @rdname svyrich
 #' @export
 svyrich.survey.design <-
-  function(formula, design, type_measure , g, type_thresh="abs",  abs_thresh=NULL, percent = 1.5 , quantiles = .50 , thresh = FALSE , na.rm = FALSE, deff = FALSE , ...){
+  function(formula, design, type_measure , g, type_thresh="abs",  abs_thresh=NULL, percent = 1.5 , quantiles = .50 , thresh = FALSE , na.rm = FALSE, deff = FALSE , influence = FALSE , ...){
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -196,9 +196,9 @@ svyrich.survey.design <-
 
     # branch on threshold type and its influence function
     if( type_thresh == 'relq' ) {
-      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, ...)
+      ARPT <- svyiqalpha(formula = formula, full_design, alpha=quantiles,  na.rm=na.rm, influence = TRUE , ...)
       th <- percent * coef(ARPT)[[1]]
-      arptlin <- percent * attr( ARPT , "influence" )
+      arptlin <- percent * attr( ARPT , "influence" )[,1]
     } else if( type_thresh == 'relm') {
       Yf <- sum( wf * incvec )
       Nf <- sum( wf )
@@ -272,15 +272,18 @@ svyrich.survey.design <-
     # keep necessary influence functions
     richlin <- richlin[ 1/full_design$prob > 0 ]
 
+    # coerce to matrix
+    richlin <- matrix( richlin , nrow = length( richlin ) , dimnames = list( names( richlin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # setup result object
     rval <- estimate
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
     attr(rval, "statistic") <- paste0( type_measure, "-" , g, "-richness measure" )
-    attr(rval, "influence") <- richlin
     if(thresh) attr(rval, "thresh") <- th
-    if ( is.character(deff) || deff) attr( rval , "deff") <- deff.estimate
+    if ( is.character(deff) || deff ) attr( rval , "deff") <- deff.estimate
+    if ( influence ) attr(rval, "influence") <- richlin
     rval
 
   }
@@ -289,7 +292,7 @@ svyrich.survey.design <-
 #' @rdname svyrich
 #' @export
 svyrich.svyrep.design <-
-  function(formula, design, type_measure, g, type_thresh="abs", abs_thresh=NULL, percent = 1.5 , quantiles = .50, thresh = FALSE , na.rm = FALSE, deff = FALSE , ...) {
+  function(formula, design, type_measure, g, type_thresh="abs", abs_thresh=NULL, percent = 1.5 , quantiles = .50, thresh = FALSE , na.rm = FALSE, deff = FALSE , influence = FALSE , return.replicates = FALSE , ...) {
 
     # chek for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your replicate-weighted survey design object immediately after creating it with the svrepdesign() function.")
@@ -403,7 +406,7 @@ svyrich.svyrep.design <-
     names( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 
     # compute deff
-    if ( is.character(deff) || deff ) {
+    if ( is.character(deff) || deff || influence ) {
 
       # compute threshold influence function on full sample
       # branch on threshold type and its influence function
@@ -444,6 +447,9 @@ svyrich.svyrep.design <-
       # add indices
       names( richlin ) <- rownames( full_design$variables )[ wsf > 0 ]
 
+      # coerce to matrix
+      richlin <- matrix( richlin , nrow = length( richlin ) , dimnames = list( names( richlin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     }
 
     # build result object
@@ -453,7 +459,18 @@ svyrich.svyrep.design <-
     attr( rval , "statistic" ) <- paste0( type_measure, "-" , g, "-richness measure" )
     if ( thresh ) attr(rval, "thresh") <- th
     if ( is.character(deff) || deff ) attr( rval , "deff" ) <- deff.estimate
-    if ( is.character(deff) || deff ) attr( rval , "influence" ) <- richlin
+    if ( influence ) attr( rval , "influence" ) <- richlin
+
+    # keep replicates
+    if (return.replicates) {
+      attr( qq , "scale") <- full_design$scale
+      attr( qq , "rscales") <- full_design$rscales
+      attr( qq , "mse") <- full_design$mse
+      rval <- list( mean = rval , replicates = qq )
+      class( rval ) <- c( "cvystat" , "svrepstat" )
+    }
+
+    # return object
     rval
 
   }
