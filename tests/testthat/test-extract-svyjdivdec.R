@@ -145,9 +145,9 @@ test_that("subsets equal svyby",{
   expect_equal( as.numeric( coef( sub_des ) ) , as.numeric( coef( sby_rep[1,] ) ) )
 
   # domain vs svyby and svydesign vs svyrepdesign:
-  # coefficients of variation should be within five percent
-  cv_diff <- max( abs( cv( sub_des ) - cv( sby_rep )[1,] ) )
-  expect_lte( cv_diff , .05 )
+  # coefficients of variation should be within twenty percent
+  cv_diff <- max( abs( cv( sub_des ) - cv( sub_rep ) ) )
+  expect_lte( cv_diff , .20 )
 
 } )
 

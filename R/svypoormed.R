@@ -215,12 +215,16 @@ svypoormed.survey.design <-
     # keep necessary influence functions
     linmedp <- linmedp[ 1/full_design$prob > 0 ]
 
+    # coerce to matrix
+    linmedp <- matrix( linmedp , nrow = length( linmedp ) , dimnames = list( names( linmedp ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
+
     # build result object
     rval <- medp
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     attr( rval , "var" ) <- variance
     attr( rval , "statistic" ) <- "poormed"
     class(rval) <- c( "cvystat" , "svystat" )
+    attr( rval , "influence" ) <- linmedp
     rval
 
   }
@@ -269,37 +273,37 @@ svypoormed.svyrep.design <-
     wsf <- weights(full_design,"sampling")
 
     # create full sample indices
-    names(incvec) <- names(wsf) <- row.names(df_full)
-    ind <- row.names(df)
+    names(incvec) <- names(wsf) <- rownames( full_design$variables )
+    ind <- rownames( full_design$variables ) %in% rownames( design$variables )
 
     # computation function
     ComputePoormed <-
       function( xf , wf , ind , quantiles , percent ){
         tresh <- percent * computeQuantiles(xf, wf, p = quantiles)
-        x<-xf[ind]
-        w<- wf[ind]
+        x <-xf[ind]
+        w <- wf[ind]
         indpoor <- (x <= tresh)
-        medp <- computeQuantiles(x[indpoor], w[indpoor], p = 0.5)
+        medp <- computeQuantiles( x[indpoor], w[indpoor], p = 0.5 )
         medp
       }
 
-    # collect domain sample weights
-    ws <- weights(design, "sampling")
-
     # compute point estimate
     rval <- ComputePoormed(xf = incvec, wf=wsf, ind= ind, quantiles = quantiles, percent = percent)
+
+    # collect domain sample weights
+    ws <- weights(design, "sampling")
 
     # collect full sample analysis weights
     wwf <- weights(full_design, "analysis")
 
     # compute replicates
     qq <- apply( wwf , 2 , function( wi ) {
-      names( wi )<- row.names( df_full )
+      names( wi ) <- rownames( df_full$variables )
       ComputePoormed( incvec , wi , ind=ind , quantiles = quantiles , percent = percent )
     } )
 
     # compute variance
-    if ( anyNA(qq ) ) variance <- NA else variance <- survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
+    variance <- if ( all( is.na( qq ) ) ) NA else survey::svrVar(qq, design$scale, design$rscales, mse = design$mse, coef = rval)
     variance <- as.matrix( variance )
     colnames( variance ) <- rownames( variance ) <-  names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
 

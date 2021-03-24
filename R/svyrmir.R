@@ -101,7 +101,7 @@ svyrmir <-
 #' @rdname svyrmir
 #' @export
 svyrmir.survey.design  <-
-  function(formula, design, age, agelim = 65, quantiles=0.5, na.rm=FALSE, med_old = FALSE, med_young = FALSE,...){
+  function(formula, design, age, agelim = 65, quantiles=0.5, na.rm=FALSE, med_old = FALSE, med_young = FALSE, influence = FALSE , ...){
 
     # check for convey_prep
     if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -143,7 +143,7 @@ svyrmir.survey.design  <-
     } else{
       ind1 <- rownames( design$variables ) %in% rownames( dsub1$variables )
     }
-    q_alpha1 <- svyiqalpha( formula , dsub1 , quantiles , ... )
+    q_alpha1 <- svyiqalpha( formula , dsub1 , quantiles , influence = TRUE , ... )
 
     ### >= 65 yo income
     dsub2 <- eval( substitute( within_function_subset( design , age >= agelim ) , list( age = age.name, agelim = agelim ) ) )
@@ -155,29 +155,21 @@ svyrmir.survey.design  <-
     }
 
     # compute quantiles
-    q_alpha2 <- svyiqalpha( formula , dsub2 , quantiles , ... )
+    q_alpha2 <- svyiqalpha( formula , dsub2 , quantiles , influence = TRUE , ... )
 
     # create objects for contrastinf
-    MED1 <- list(value = q_alpha1[[1]] , lin = rep( 0 , length( w ) ) )
-    MED2 <- list(value = q_alpha2[[1]] , lin = rep( 0 , length( w ) ) )
+    MED1 <- list(value = q_alpha1[[1]] , lin = rep( 0 , nrow( design$variables ) ) )
+    MED2 <- list(value = q_alpha2[[1]] , lin = rep( 0 , nrow( design$variables ) ) )
 
     # add partial linearizations
-    MED1$lin [ ind1 & w>0 ] <- attr( q_alpha1 , "influence" )
-    MED2$lin [ ind2 & w>0 ] <- attr( q_alpha2 , "influence" )
+    MED1$lin [ rownames( design$variables ) %in% rownames( attr( q_alpha1 , "influence" ) ) ] <- attr( q_alpha1 , "influence" )[,1]
+    MED2$lin [ rownames( design$variables ) %in% rownames( attr( q_alpha2 , "influence" ) ) ] <- attr( q_alpha2 , "influence" )[,1]
     list_all<- list(MED1=MED1, MED2=MED2)
 
     # linearize ratio of medians
     RMED <- contrastinf( quote( MED2/MED1 ),list_all )
-    lin <- as.numeric( RMED$lin )
+    lin <- RMED$lin[,1]
     names( lin ) <- rownames( design$variables )
-
-    # treat out of sample
-    if ( length( lin ) != length( design$prob ) ) {
-      lin <- lin[ pmatch( rownames( design$variables ) , names(lin) ) ]
-      lin[ w <= 0] <- 0
-      names( lin ) <- rownames( design$variables )
-      lin[ is.na( lin ) ] <- 0
-    }
 
     # compute variance
     variance <- survey::svyrecvar( lin/design$prob, design$cluster, design$strata, design$fpc, postStrata = design$postStrata )
@@ -186,14 +178,16 @@ svyrmir.survey.design  <-
 
     # keep necessary influence functions
     lin <- lin[ 1/design$prob > 0 ]
-    names( lin ) <- rownames( design$variables )[ 1/design$prob > 0 ]
+
+    # coerce to matrix
+    lin <- matrix( lin , nrow = length( lin ) , dimnames = list( names( lin ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
 
     # build result object
     rval <- as.numeric( RMED$value )
     names( rval ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
     class(rval) <- c( "cvystat" , "svystat" )
     attr(rval, "var") <- variance
-    attr(rval,"influence") <- lin
+    if ( influence ) attr(rval,"influence") <- lin
     if (med_old) attr( rval, "med_old") <- q_alpha2
     if (med_young) attr( rval, "med_young") <- q_alpha1
     attr( rval , "statistic" ) <- "rmir"

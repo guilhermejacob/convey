@@ -98,7 +98,7 @@ svyrmpg <-
 #' @rdname svyrmpg
 #' @export
 svyrmpg.survey.design <-
-	function(formula, design, quantiles = 0.5, percent = 0.6, na.rm=FALSE, thresh = FALSE, poor_median = FALSE,...) {
+	function(formula, design, quantiles = 0.5, percent = 0.6, na.rm=FALSE, thresh = FALSE, poor_median = FALSE, influence = FALSE , ...) {
 
 	  # check for convey_prep
 		if (is.null(attr(design, "full_design"))) stop("you must run the ?convey_prep function on your linearized survey design object immediately after creating it with the svydesign() function.")
@@ -128,14 +128,32 @@ svyrmpg.survey.design <-
 		}
 
 		# compute threshold
-		ARPT <- svyarpt(formula = formula, full_design, quantiles = quantiles, percent = percent, na.rm = na.rm )
+		ARPT <- svyarpt(formula = formula, full_design, quantiles = quantiles, percent = percent, na.rm = na.rm , influence = TRUE )
 		arpt <- coef(ARPT)
-		linarpt <- attr(ARPT, "influence")
+		linarpt <- attr(ARPT, "influence")[,1]
+
+		# ensure length
+		if ( length( linarpt ) != length( full_design$prob ) ) {
+		  tmplin <- rep( 0 , nrow( full_design$variables ) )
+		  tmplin[ rownames( full_design$variables ) %in% names( linarpt ) ] <- linarpt
+		  linarpt <- tmplin ; rm( tmplin )
+		  names( linarpt ) <- rownames( full_design$variables )
+		}
 
 		# compute poormed
-		POORMED <- svypoormed(formula = formula, design = design, quantiles = quantiles, percent = percent, na.rm = na.rm)
+		POORMED <- svypoormed(formula = formula, design = design, quantiles = quantiles, percent = percent, na.rm = na.rm )
 		medp <- coef(POORMED)
-		linmedp <- attr(POORMED, "influence")
+		linmedp <- attr(POORMED, "influence")[,1]
+
+		# ensure length
+		if ( length( linmedp ) != length( full_design$prob ) ) {
+		  tmplin <- rep( 0 , nrow( full_design$variables ) )
+		  tmplin[ rownames( full_design$variables ) %in% names( linmedp ) ] <- linmedp
+		  linmedp <- tmplin ; rm( tmplin )
+		  names( linmedp ) <- rownames( full_design$variables )
+		}
+
+		# create objects
 		MEDP <- list(value = medp, lin = linmedp)
 		ARPT <- list(value = arpt, lin = linarpt)
 		list_all<- list(ARPT=ARPT, MEDP=MEDP)
@@ -159,20 +177,26 @@ svyrmpg.survey.design <-
 
 		# linearize RMPG
 		RMPG <- contrastinf( quote( 1 - MEDP / ARPT ) , list_all )
-		infun <- as.numeric(RMPG$lin)
+		infun <- RMPG$lin[,1]
 
 		# ensure length
 		if ( length( infun ) != length( full_design$prob ) ) {
-		  names( infun ) <- rownames( design$variables )[ 1/design$prob > 0 ]
-		  infun <- infun[ pmatch( rownames( full_design$variables ) , names( infun ) ) ]
+		  tmplin <- rep( 0 , nrow( full_design$variables ) )
+		  tmplin[ rownames( full_design$variables ) %in% names( infun ) ] <- infun
+		  infun <- tmplin ; rm( tmplin )
 		  names( infun ) <- rownames( full_design$variables )
-		  infun[ is.na( infun ) ] <- 0
 		}
 
 		# compute variance
 		variance <- survey::svyrecvar(infun/full_design$prob, full_design$cluster,full_design$strata, full_design$fpc,postStrata = full_design$postStrata)
 		variance[ is.nan( variance ) ] <- NA
 		colnames( variance ) <- rownames( variance ) <- strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]]
+
+		# keep necessary influence functions
+		infun <- infun[ 1/full_design$prob > 0 ]
+
+		# coerce to matrix
+		infun <- matrix( infun , nrow = length( infun ) , dimnames = list( names( infun ) , strsplit( as.character( formula )[[2]] , ' \\+ ' )[[1]] ) )
 
 		# build result object
 		rval <- RMPG$value

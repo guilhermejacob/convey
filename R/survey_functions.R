@@ -7,11 +7,10 @@
 # https://stat.ethz.ch/pipermail/r-devel/2013-August/thread.html#67180
 
 computeQuantiles <- function(xx, w, p) {
-    if (any(is.na(xx)))
-        return(NA * p)
 
     xx <- xx[w>0]
     w <- w[w>0]
+    if ( any( is.na( xx ) ) || length(xx) == 0 ) return(NA * p)
     oo <- order(xx)
     cum.w <- cumsum(w[oo])/sum(w)
     cdf <- approxfun(cum.w, xx[oo], method = "constant", f = 1, yleft = min(xx),
