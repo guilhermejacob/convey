@@ -18,6 +18,7 @@ svyrmir(formula, design, ...)
   na.rm = FALSE,
   med_old = FALSE,
   med_young = FALSE,
+  influence = FALSE,
   ...
 )
 

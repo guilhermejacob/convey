@@ -17,6 +17,7 @@ svyrmpg(formula, design, ...)
   na.rm = FALSE,
   thresh = FALSE,
   poor_median = FALSE,
+  influence = FALSE,
   ...
 )
 
